@@ -88,3 +88,13 @@ Approve the stage in npm's Staged Packages tab, or run
 in an authenticated terminal and complete 2FA. Afterwards, rerun Release in
 publish mode to verify the existing npm archive and update the GitHub release
 note. It refuses to replace an existing version with different archive bytes.
+
+### Publication confirmed
+
+The maintainer approved the staged package. Registry lookup now returns
+privacy-mask-video@0.1.0. Its SHA-512 integrity matches the staged archive:
+`sha512-7VFSY8JR6FceH31UAvjRwydBA5GYLtrzWXddRTVB9PEK2zfkRvQdlZPFcxnGe6gLi4/NGi0GsMi/7zinKkDDoA==`.
+Registry SHA-1: `7d424315c0e86e18659c7130a98564a386c7063e`.
+The GitHub release pipeline is rerun in publish mode to independently compare
+the rebuilt archive, clear the pending-publication release note, and finish
+with dependency auditing and CodeQL. Runtime qualification remains deferred.
