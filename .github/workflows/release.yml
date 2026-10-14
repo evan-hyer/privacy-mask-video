@@ -4,6 +4,12 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Publish directly, or stage for npm account 2FA approval
+        type: choice
+        options: [publish, stage]
+        default: publish
 
 permissions:
   contents: read
@@ -29,6 +35,7 @@ jobs:
           node-version: '24'
           registry-url: https://registry.npmjs.org
           cache: npm
+      - run: npm install --global npm@12.2.0 --ignore-scripts --no-audit --no-fund
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run assets:prepare
       - name: Build and inspect package
@@ -37,22 +44,29 @@ jobs:
           npm pack --ignore-scripts --json > pack.json
           node scripts/release-registry.mjs prepare
       - name: Publish and verify registry integrity
+        id: registry
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_MODE: ${{ inputs.mode || 'publish' }}
         run: node scripts/release-registry.mjs publish
       - name: Create experimental GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          REGISTRY_STATUS: ${{ steps.registry.outputs.status }}
         run: |
           version=$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')
           archive="privacy-mask-video-$version.tgz"
           sha256sum "$archive" > "$archive.sha256"
+          cp RELEASE_NOTES.md release-notes.md
+          if [ "$REGISTRY_STATUS" = staged ]; then
+            printf '\nNpm version %s is staged, pending maintainer 2FA approval. It is not yet installable from npm. Download the attached archive in the meantime.\n' "$version" >> release-notes.md
+          fi
           if gh release view "v$version" >/dev/null 2>&1; then
             gh release upload "v$version" "$archive" "$archive.sha256" --clobber
           else
             gh release create "v$version" "$archive" "$archive.sha256" \
               --target "$GITHUB_SHA" --title "v$version (experimental)" \
-              --prerelease --notes-file RELEASE_NOTES.md
+              --prerelease --notes-file release-notes.md
           fi
 
   security:

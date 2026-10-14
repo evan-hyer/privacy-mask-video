@@ -25,13 +25,23 @@ if (process.argv[2] === 'prepare') {
     return response.json();
   }
   let published = await registryVersion();
+  if (!published && process.env.RELEASE_MODE === 'stage') {
+    const result = spawnSync('npm', ['stage', 'publish', `./${pack.filename}`, '--access', 'public', '--provenance', '--ignore-scripts'], { stdio: 'inherit' });
+    if (result.status !== 0) throw new Error('npm staging failed');
+    if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, 'status=staged\n');
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      await appendFile(process.env.GITHUB_STEP_SUMMARY, `Staged ${pkg.name}@${pkg.version}; maintainer must approve with 2FA on npmjs.com. Not yet published.\n`);
+    }
+    process.exit(0);
+  }
   if (!published) {
-    const result = spawnSync('npm', ['publish', pack.filename, '--access', 'public', '--provenance', '--ignore-scripts', '--fetch-retries=0', '--fetch-timeout=300000'], { stdio: 'inherit' });
+    const result = spawnSync('npm', ['publish', `./${pack.filename}`, '--access', 'public', '--provenance', '--ignore-scripts', '--fetch-retries=0', '--fetch-timeout=300000'], { stdio: 'inherit' });
     if (result.status !== 0) throw new Error('npm publication failed');
     published = await registryVersion();
   }
   if (published?.dist?.integrity !== integrity) throw new Error('Published version does not match this archive');
   console.log(`Verified ${pkg.name}@${pkg.version} registry integrity`);
+  if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, 'status=published\n');
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(process.env.GITHUB_STEP_SUMMARY, `Published and verified ${pkg.name}@${pkg.version}. Runtime qualification remains deferred.\n`);
   }

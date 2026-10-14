@@ -31,6 +31,11 @@ integrity, and creates an experimental GitHub release with the archive and
 checksum. The final job runs dependency auditing and CodeQL security analysis.
 Runtime testing remains deferred. A failed security job requires review even
 when publication has already succeeded; it cannot undo a published version.
+If npm requires account 2FA for direct publication, run the workflow with mode
+`stage`, then approve the prepared version in npm's Staged Packages tab. Staging
+creates the GitHub prerelease with an explicit npm-pending note. After approval,
+the archive checksum can be compared with npm's `dist.integrity`; update the
+release note to reflect confirmed publication.
 
 Initial publishing uses the encrypted `NPM_TOKEN` repository secret. Configure
 npm trusted publishing for owner `evan-hyer`, repository `privacy-mask-video`,
