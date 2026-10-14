@@ -26,3 +26,24 @@ Git and restored using the pinned preparation script; they are included in npm.
 Git destination: https://github.com/evan-hyer/privacy-mask-video.git, main.
 Publication and push outcomes are reported to the user after the commands return;
 this preparation document alone does not assert that npm publication succeeded.
+
+## Outcome
+
+- Implementation/release preparation committed as
+  a3ae7810df44a455491e62ff5625f954002cb79c and pushed to origin/main. The remote
+  head was verified to match.
+- npm authentication subsequently succeeded as evan-hyer.
+- Checked archive: privacy-mask-video-0.1.0.tgz in the machine's TEMP directory;
+  103 files, 50,025,482 compressed bytes. All 26 resource hashes match; no source
+  maps, local configuration, credentials, test fixtures or repository tooling.
+- npm publication failed with FETCH_ERROR/network timeout at the package's
+  registry endpoint. Authenticated retries with 120-second and 900-second
+  request timeouts also failed. Automatic retries were disabled on the final
+  attempts. No publish process is left running.
+- Publication is not confirmed; registry lookups returned E404. The package is
+  ready for publication from a working connection. No deferred runtime testing
+  was introduced to prepare the release.
+
+Resume with `npm publish` from the prepared checkout on a working connection
+(or publish the verified temporary tarball with --access public --ignore-scripts).
+Verify the registry version and integrity before reporting a successful release.
