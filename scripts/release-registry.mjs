@@ -7,8 +7,9 @@ const tag = `v${pkg.version}`;
 if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== tag) {
   throw new Error('Release tag must match package.json version');
 }
-const pack = JSON.parse(await readFile('pack.json', 'utf8'))[0];
-if (pack.name !== pkg.name || pack.version !== pkg.version || pack.filename !== `${pkg.name}-${pkg.version}.tgz`) {
+const packOutput = JSON.parse(await readFile('pack.json', 'utf8'));
+const pack = Array.isArray(packOutput) ? packOutput[0] : packOutput[pkg.name];
+if (!pack || pack.name !== pkg.name || pack.version !== pkg.version || pack.filename !== `${pkg.name}-${pkg.version}.tgz`) {
   throw new Error('Unexpected release archive');
 }
 const bytes = await readFile(pack.filename);
