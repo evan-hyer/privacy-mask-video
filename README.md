@@ -24,6 +24,20 @@ notices; installed consumers do not need to download resources from upstream.
 Asset and worker subpaths are exported for host tooling. Importing the component
 does not automatically copy static assets for a consuming bundler.
 
+Maintainers can run the **Release** workflow from GitHub Actions or push a
+`v<package.json version>` tag. It restores pinned assets, compiles/builds and
+inspects the archive, publishes to npm with provenance, verifies registry
+integrity, and creates an experimental GitHub release with the archive and
+checksum. The final job runs dependency auditing and CodeQL security analysis.
+Runtime testing remains deferred. A failed security job requires review even
+when publication has already succeeded; it cannot undo a published version.
+
+Initial publishing uses the encrypted `NPM_TOKEN` repository secret. Configure
+npm trusted publishing for owner `evan-hyer`, repository `privacy-mask-video`,
+workflow `release.yml`, with direct publication allowed, then remove that secret
+to use short-lived OIDC credentials. See
+[npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+
 ## Run locally
 
 Use Node.js 24:

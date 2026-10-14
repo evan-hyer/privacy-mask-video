@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'evan-hyer/privacy-mask-video'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run assets:prepare
+      - name: Build and inspect package
+        run: |
+          npm run prepack
+          npm pack --ignore-scripts --json > pack.json
+          node scripts/release-registry.mjs prepare
+      - name: Publish and verify registry integrity
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/release-registry.mjs publish
+      - name: Create experimental GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')
+          archive="privacy-mask-video-$version.tgz"
+          sha256sum "$archive" > "$archive.sha256"
+          if gh release view "v$version" >/dev/null 2>&1; then
+            gh release upload "v$version" "$archive" "$archive.sha256" --clobber
+          else
+            gh release create "v$version" "$archive" "$archive.sha256" \
+              --target "$GITHUB_SHA" --title "v$version (experimental)" \
+              --prerelease --notes-file RELEASE_NOTES.md
+          fi
+
+  security:
+    name: Final security analysis
+    needs: release
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: github/codeql-action/init@f3c49fd1ef3281abc41069b3dd22807a60c963f6 # v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - uses: github/codeql-action/analyze@f3c49fd1ef3281abc41069b3dd22807a60c963f6 # v4
+        if: always()

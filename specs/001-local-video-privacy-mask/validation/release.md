@@ -47,3 +47,21 @@ this preparation document alone does not assert that npm publication succeeded.
 Resume with `npm publish` from the prepared checkout on a working connection
 (or publish the verified temporary tarball with --access public --ignore-scripts).
 Verify the registry version and integrity before reporting a successful release.
+
+## Automated release continuation
+
+The user additionally authorized an npm/GitHub release pipeline, push, final
+security analysis and cleanup. Two further local upload attempts (120-second
+timeouts, including IPv4 preference) failed with FETCH_ERROR. Authentication
+and registry reads worked; no publication was claimed.
+
+`.github/workflows/release.yml` provides tag/manual release execution, pinned
+actions, Node 24, restored verified assets, prepack inspection, npm publication
+with provenance, exact registry-integrity verification, and an experimental
+GitHub release with archive/checksum. Dependency auditing and extended CodeQL
+analysis run as the final job, including when the release job fails.
+
+The existing npm credential was transferred directly to an encrypted GitHub
+repository secret, without displaying or committing its value. Recommend npm
+OIDC trusted publishing and removal of the bootstrap secret after setup.
+Security analysis does not replace the deferred runtime qualification.
