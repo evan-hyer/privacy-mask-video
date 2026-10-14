@@ -1,0 +1,7 @@
+# package.json files is the publish allowlist. Nested ignores in src/ and dist/
+# exclude generated/debug/local files inside those explicitly included folders.
+**/*.map
+**/*.tmp
+**/*.tgz
+.npmrc
+.env*

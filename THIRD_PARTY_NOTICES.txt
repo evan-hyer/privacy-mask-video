@@ -1,0 +1,39 @@
+Privacy Mask Video - third-party resources
+
+Exact resource revisions, SHA-256 hashes, tensor signatures, and sizes are in
+assets/manifest.json. Full upstream license texts are shipped in assets/licenses/.
+
+Mediabunny 1.61.4 - Copyright Vanilagy and contributors - MPL-2.0
+  https://github.com/Vanilagy/mediabunny
+  assets/licenses/mediabunny.txt
+  This component uses the unmodified library. Corresponding source is available
+  in the pinned npm package (including src/) and from its upstream repository.
+
+ONNX Runtime Web 1.30.0 - Copyright Microsoft Corporation - MIT
+  https://github.com/microsoft/onnxruntime
+  assets/licenses/onnxruntime.txt
+  assets/licenses/onnxruntime-dependencies.txt contains the upstream notices
+  for the runtime's native/WASM dependencies.
+
+Runtime JavaScript dependency notices are also included for flatbuffers and
+long (Apache-2.0), platform (MIT), protobufjs and its @protobufjs helpers
+(BSD-3-Clause). Exact versions and notice hashes are recorded in the manifest.
+The onnxruntime-common package is covered by the ONNX Runtime MIT license.
+
+YuNet 2023mar - Copyright Shiqi Yu - MIT
+  OpenCV Zoo revision 47534e27c9851bb1128ccc0102f1145e27f23f98
+  assets/licenses/face_detection_yunet.txt
+
+SFace 2021dec - Apache-2.0
+  OpenCV Zoo revision 47534e27c9851bb1128ccc0102f1145e27f23f98
+  assets/licenses/face_recognition_sface.txt
+
+Noto Color Emoji font - Copyright Google Inc. - SIL Open Font License 1.1
+Noto Emoji source/sequence selection - Apache-2.0
+  Revision e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e
+  assets/licenses/noto-emoji.txt
+  assets/licenses/noto-source.txt
+
+Development tooling (not browser runtime): TypeScript, Vite, Vitest, Playwright.
+Their licenses are included in their exact dependency packages in node_modules.
+The lockfile records their transitive dependency versions and npm integrity data.

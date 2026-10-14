@@ -1,0 +1,26 @@
+node_modules/
+dist/
+build/
+coverage/
+test-results/
+playwright-report/
+*.log
+*.tgz
+.npmrc
+.env*
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
+# Prepared binary resources are restored from the pinned manifest.
+assets/models/*.onnx
+assets/runtime/*.wasm
+assets/runtime/*.mjs
+assets/emoji/*.ttf
+# Local video fixtures must never be committed accidentally.
+tests/fixtures/**/*.mp4
+tests/fixtures/**/*.webm
+tests/fixtures/**/*.mov
+tests/fixtures/**/*.mkv

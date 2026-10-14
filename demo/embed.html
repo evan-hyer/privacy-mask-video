@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Two Privacy Mask Video components</title><style>body{font-family:system-ui,sans-serif;background:#edf2f6;margin:0;padding:24px}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:24px}a{color:#155bc0}</style></head>
+<body><h1>Independent local video components</h1><p>Load a different local video into each component. Each has its own worker, selection, settings and result.</p><p><a href="index.html">Back to single component</a></p><main><privacy-mask-video id="first" aria-label="First local video"></privacy-mask-video><privacy-mask-video id="second" aria-label="Second local video"></privacy-mask-video></main><script type="module">
+// Pre-upgrade settings are replayed by the native element after registration.
+document.getElementById('second').emoji='🤖';
+await import('../define.js');
+</script></body></html>

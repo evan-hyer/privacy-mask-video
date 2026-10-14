@@ -1,0 +1,4 @@
+* text=auto eol=lf
+# Asset hashes refer to exact upstream bytes, including license line endings.
+assets/** -text
+assets/licenses/** -whitespace

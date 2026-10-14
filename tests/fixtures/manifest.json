@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "status": "incomplete",
+  "requiredScenarios": [
+    "multi-face", "translation", "scale", "tilt", "crossing", "no-initial-detection",
+    "occlusion-reentry", "manual", "mp4", "webm", "portrait", "vfr", "b-frames",
+    "audio-offset", "multiple-audio", "silent", "corrupt", "resource-limits", "benchmark-720p60"
+  ],
+  "entries": [],
+  "missing": "No local real-face corpus or annotations are available. Real consented/licensed calibration and held-out acceptance clips are required; synthetic timing media cannot satisfy face tracking acceptance."
+}

@@ -1,0 +1,11 @@
+import { buildDistribution } from './build.mjs';
+import { verifyAssets } from './verify-assets.mjs';
+import { createServer } from 'vite';
+import { projectRoot } from './integrity.mjs';
+import path from 'node:path';
+await verifyAssets();
+await buildDistribution();
+const server=await createServer({configFile:false,root:path.join(projectRoot,'dist'),server:{host:'127.0.0.1',port:5173,strictPort:true,open:false},publicDir:false});
+await server.listen();
+console.log('Demo: http://localhost:5173/demo/index.html (rebuild/restart after source changes)');
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>void server.close().then(()=>process.exit(0)));

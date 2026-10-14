@@ -1,0 +1,12 @@
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { verifyAssets } from './verify-assets.mjs';
+import { buildDistribution } from './build.mjs';
+import { projectRoot } from './integrity.mjs';
+const tsc=fileURLToPath(new URL('../node_modules/typescript/bin/tsc',import.meta.url));
+const result=spawnSync(process.execPath,[tsc,'--noEmit'],{cwd:projectRoot,stdio:'inherit'});
+if(result.status!==0)throw new Error('Package compilation failed');
+await verifyAssets();
+await buildDistribution();
+await import('./inspect-dist.mjs');
+console.log('Publish packaging checks passed. Runtime tests remain deferred.');

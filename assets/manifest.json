@@ -1,0 +1,413 @@
+{
+  "schemaVersion": 1,
+  "runtimeVersion": "1.30.0",
+  "entries": [
+    {
+      "path": "models/face_detection_yunet_2023mar.onnx",
+      "kind": "model",
+      "url": "https://media.githubusercontent.com/media/opencv/opencv_zoo/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+      "revision": "47534e27c9851bb1128ccc0102f1145e27f23f98",
+      "license": "MIT",
+      "notice": "licenses/face_detection_yunet.txt",
+      "size": 232589,
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+      "tensors": {
+        "inputs": [
+          {
+            "name": "input",
+            "dataType": 1,
+            "shape": [
+              1,
+              3,
+              640,
+              640
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "name": "cls_8",
+            "dataType": 1,
+            "shape": [
+              1,
+              6400,
+              1
+            ]
+          },
+          {
+            "name": "cls_16",
+            "dataType": 1,
+            "shape": [
+              1,
+              1600,
+              1
+            ]
+          },
+          {
+            "name": "cls_32",
+            "dataType": 1,
+            "shape": [
+              1,
+              400,
+              1
+            ]
+          },
+          {
+            "name": "obj_8",
+            "dataType": 1,
+            "shape": [
+              1,
+              6400,
+              1
+            ]
+          },
+          {
+            "name": "obj_16",
+            "dataType": 1,
+            "shape": [
+              1,
+              1600,
+              1
+            ]
+          },
+          {
+            "name": "obj_32",
+            "dataType": 1,
+            "shape": [
+              1,
+              400,
+              1
+            ]
+          },
+          {
+            "name": "bbox_8",
+            "dataType": 1,
+            "shape": [
+              1,
+              6400,
+              4
+            ]
+          },
+          {
+            "name": "bbox_16",
+            "dataType": 1,
+            "shape": [
+              1,
+              1600,
+              4
+            ]
+          },
+          {
+            "name": "bbox_32",
+            "dataType": 1,
+            "shape": [
+              1,
+              400,
+              4
+            ]
+          },
+          {
+            "name": "kps_8",
+            "dataType": 1,
+            "shape": [
+              1,
+              6400,
+              10
+            ]
+          },
+          {
+            "name": "kps_16",
+            "dataType": 1,
+            "shape": [
+              1,
+              1600,
+              10
+            ]
+          },
+          {
+            "name": "kps_32",
+            "dataType": 1,
+            "shape": [
+              1,
+              400,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "licenses/face_detection_yunet.txt",
+      "kind": "license",
+      "url": "https://raw.githubusercontent.com/opencv/opencv_zoo/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet/LICENSE",
+      "revision": "47534e27c9851bb1128ccc0102f1145e27f23f98",
+      "license": "MIT",
+      "notice": "licenses/face_detection_yunet.txt",
+      "size": 1085,
+      "sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958"
+    },
+    {
+      "path": "models/face_recognition_sface_2021dec.onnx",
+      "kind": "model",
+      "url": "https://media.githubusercontent.com/media/opencv/opencv_zoo/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
+      "revision": "47534e27c9851bb1128ccc0102f1145e27f23f98",
+      "license": "Apache-2.0",
+      "notice": "licenses/face_recognition_sface.txt",
+      "size": 38696353,
+      "sha256": "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79",
+      "tensors": {
+        "inputs": [
+          {
+            "name": "data",
+            "dataType": 1,
+            "shape": [
+              1,
+              3,
+              112,
+              112
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "name": "fc1",
+            "dataType": 1,
+            "shape": [
+              1,
+              128
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "path": "licenses/face_recognition_sface.txt",
+      "kind": "license",
+      "url": "https://raw.githubusercontent.com/opencv/opencv_zoo/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface/LICENSE",
+      "revision": "47534e27c9851bb1128ccc0102f1145e27f23f98",
+      "license": "Apache-2.0",
+      "notice": "licenses/face_recognition_sface.txt",
+      "size": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "licenses/onnxruntime.txt",
+      "kind": "license",
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.30.0/LICENSE",
+      "revision": "v1.30.0",
+      "license": "MIT",
+      "notice": "licenses/onnxruntime.txt",
+      "size": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "runtime/ort-wasm-simd-threaded.mjs",
+      "kind": "runtime-module",
+      "localSource": "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs",
+      "revision": "1.30.0",
+      "license": "MIT",
+      "notice": "licenses/onnxruntime.txt",
+      "size": 24381,
+      "sha256": "e13f7f94fc51b4ca72b12faeb1ee95f4ace6dfbc8939bc718aabdc0a27c4299b"
+    },
+    {
+      "path": "runtime/ort-wasm-simd-threaded.wasm",
+      "kind": "runtime-wasm",
+      "localSource": "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
+      "revision": "1.30.0",
+      "license": "MIT",
+      "notice": "licenses/onnxruntime.txt",
+      "size": 14239897,
+      "sha256": "3398c10d07d229bd91b364548e130e0e51a8e5704b88c7c083ebbeb78842dee2"
+    },
+    {
+      "path": "licenses/noto-emoji.txt",
+      "kind": "license",
+      "url": "https://raw.githubusercontent.com/googlefonts/noto-emoji/e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e/2D/fonts/LICENSE",
+      "revision": "e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e",
+      "license": "OFL-1.1",
+      "notice": "licenses/noto-emoji.txt",
+      "size": 4301,
+      "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2"
+    },
+    {
+      "path": "emoji/NotoColorEmoji.ttf",
+      "kind": "font",
+      "url": "https://raw.githubusercontent.com/googlefonts/noto-emoji/e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e/2D/fonts/NotoColorEmoji.ttf",
+      "revision": "e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e",
+      "license": "OFL-1.1",
+      "notice": "licenses/noto-emoji.txt",
+      "size": 10730124,
+      "sha256": "15671215ab769fdc7162a045d56fd7d7e477c51b04e6b3c761d914d8fdd6cc44"
+    },
+    {
+      "path": "emoji/sequences.json",
+      "kind": "emoji-sequences",
+      "revision": "e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e",
+      "license": "Apache-2.0",
+      "notice": "licenses/noto-source.txt",
+      "size": 400,
+      "sha256": "0151d56bed15267a2ceb24779fe623ad3ed8005aa7912d88d3c83bcd639e3cb8"
+    },
+    {
+      "path": "licenses/noto-source.txt",
+      "kind": "license",
+      "url": "https://raw.githubusercontent.com/googlefonts/noto-emoji/e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e/LICENSE",
+      "revision": "e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e",
+      "license": "Apache-2.0",
+      "notice": "licenses/noto-source.txt",
+      "size": 4330,
+      "sha256": "500bb1ccf43df7bbb522112f9133a52b16e1c35e809632f5d8609b179152de5b"
+    },
+    {
+      "path": "licenses/mediabunny.txt",
+      "kind": "license",
+      "localSource": "node_modules/mediabunny/LICENSE",
+      "revision": "1.61.4",
+      "license": "MPL-2.0",
+      "notice": "licenses/mediabunny.txt",
+      "size": 16726,
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+    },
+    {
+      "path": "licenses/flatbuffers.txt",
+      "kind": "license",
+      "localSource": "node_modules/flatbuffers/LICENSE",
+      "revision": "25.9.23",
+      "license": "Apache-2.0",
+      "notice": "licenses/flatbuffers.txt",
+      "size": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "licenses/long.txt",
+      "kind": "license",
+      "localSource": "node_modules/long/LICENSE",
+      "revision": "5.3.2",
+      "license": "Apache-2.0",
+      "notice": "licenses/long.txt",
+      "size": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "licenses/platform.txt",
+      "kind": "license",
+      "localSource": "node_modules/platform/LICENSE",
+      "revision": "1.3.6",
+      "license": "MIT",
+      "notice": "licenses/platform.txt",
+      "size": 1095,
+      "sha256": "4a161ebed4f1ef933e16ccfa00d86c718703f5d015a9987ea7ce1bb72a43cd22"
+    },
+    {
+      "path": "licenses/protobufjs.txt",
+      "kind": "license",
+      "localSource": "node_modules/protobufjs/LICENSE",
+      "revision": "7.6.6",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs.txt",
+      "size": 1937,
+      "sha256": "49d6a1c9a623784c61c6cb70f773f3457faceb1914a13c8560a9823b7631950c"
+    },
+    {
+      "path": "licenses/protobufjs-aspromise.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/aspromise/LICENSE",
+      "revision": "1.1.2",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-aspromise.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/protobufjs-base64.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/base64/LICENSE",
+      "revision": "1.1.2",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-base64.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/protobufjs-codegen.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/codegen/LICENSE",
+      "revision": "2.0.5",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-codegen.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/protobufjs-eventemitter.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/eventemitter/LICENSE",
+      "revision": "1.1.1",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-eventemitter.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/protobufjs-fetch.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/fetch/LICENSE",
+      "revision": "1.1.1",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-fetch.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/protobufjs-float.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/float/LICENSE",
+      "revision": "1.0.2",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-float.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/protobufjs-path.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/path/LICENSE",
+      "revision": "1.1.2",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-path.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/protobufjs-pool.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/pool/LICENSE",
+      "revision": "1.1.0",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-pool.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/protobufjs-utf8.txt",
+      "kind": "license",
+      "localSource": "node_modules/@protobufjs/utf8/LICENSE",
+      "revision": "1.1.2",
+      "license": "BSD-3-Clause",
+      "notice": "licenses/protobufjs-utf8.txt",
+      "size": 1505,
+      "sha256": "a67b34a24a5daddcce46aea68c5004e4442bbfb63690329fa607bf4de4269794"
+    },
+    {
+      "path": "licenses/onnxruntime-dependencies.txt",
+      "kind": "license",
+      "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.30.0/ThirdPartyNotices.txt",
+      "revision": "v1.30.0",
+      "license": "upstream-third-party-notices",
+      "notice": "licenses/onnxruntime-dependencies.txt",
+      "size": 338088,
+      "sha256": "143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "status": "uncalibrated",
+  "profileVersion": "1-provisional",
+  "reason": "The user deferred testing and corpus acquisition on 2026-10-14. Numeric parameters in src/vision/profile.ts are provisional; no calibration or acceptance measurements exist.",
+  "measurements": null,
+  "qualified": false
+}
