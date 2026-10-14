@@ -9,6 +9,12 @@ reviewed asset integrity, worker ownership, media lifecycle and release controls
 No confirmed exploitable vulnerability was found. This is not proof of browser
 privacy, tracking coverage or malformed-media safety.
 
+The final release run 38589122375 also completed its final security job
+successfully after npm staging and GitHub prerelease creation. All five prior
+alerts were dismissed with reviewed evidence; the GitHub API reports zero open
+CodeQL alerts. Final workflow/staging changes received a second read-only analyst
+review, which found no new concrete security bug.
+
 ## CodeQL triage
 
 All five medium alerts were reviewed as false positives in this trust model:

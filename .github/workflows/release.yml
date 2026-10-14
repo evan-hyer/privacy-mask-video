@@ -63,6 +63,7 @@ jobs:
           fi
           if gh release view "v$version" >/dev/null 2>&1; then
             gh release upload "v$version" "$archive" "$archive.sha256" --clobber
+            gh release edit "v$version" --notes-file release-notes.md
           else
             gh release create "v$version" "$archive" "$archive.sha256" \
               --target "$GITHUB_SHA" --title "v$version (experimental)" \

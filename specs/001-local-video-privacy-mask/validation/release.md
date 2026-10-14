@@ -65,3 +65,26 @@ The existing npm credential was transferred directly to an encrypted GitHub
 repository secret, without displaying or committing its value. Recommend npm
 OIDC trusted publishing and removal of the bootstrap secret after setup.
 Security analysis does not replace the deferred runtime qualification.
+
+### Staged release outcome
+
+GitHub runner 38587728626 exposed the actual account blocker: EOTP, requiring
+npm browser/2FA authentication. Local uploads continued to time out. No account
+security setting was weakened to make publication pass.
+
+Run 38589122375 successfully built/inspected and staged the release using npm
+12.2.0, with provenance. npm stage ID:
+`90d21875-f826-47de-95a2-006f4f2a8696`. Version 0.1.0 is awaiting the maintainer's
+2FA approval; staging is not public publication. npm may expose its automatic
+0.0.0-stage placeholder until approval.
+
+GitHub experimental release v0.1.0 was created at commit df351f9 with the same
+50,025,542-byte archive and SHA-256 checksum file. Archive SHA-256:
+`f0f2931df9eab0bd3746c7a0d56d1dcf7308592a09cf9d4e8b6f35235e400330`.
+Release: https://github.com/evan-hyer/privacy-mask-video/releases/tag/v0.1.0
+
+Approve the stage in npm's Staged Packages tab, or run
+`npx npm@12.2.0 stage approve 90d21875-f826-47de-95a2-006f4f2a8696`
+in an authenticated terminal and complete 2FA. Afterwards, rerun Release in
+publish mode to verify the existing npm archive and update the GitHub release
+note. It refuses to replace an existing version with different archive bytes.
