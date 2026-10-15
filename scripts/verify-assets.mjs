@@ -25,7 +25,7 @@ export async function verifyAssets() {
       throw new Error(`Tensor signature mismatch: ${entry.path}`);
     }
   }
-  for (const kind of ['model', 'runtime-module', 'runtime-wasm', 'font', 'emoji-sequences', 'license']) {
+  for (const kind of ['model', 'runtime-module', 'runtime-wasm', 'emoji-image', 'emoji-sequences', 'license']) {
     if (!kinds.has(kind)) throw new Error(`Missing required asset kind: ${kind}`);
   }
   for (const entry of manifest.entries) {

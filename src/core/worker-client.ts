@@ -36,7 +36,7 @@ export class WorkerClient {
         this.pending = null;
         this.ready = false;
         this.worker?.terminate(); this.worker = null;
-        pending?.reject(failure('worker-failed'));
+        pending?.reject(failure('worker-failed',{stage:'worker',reason:'worker'}));
       };
     }
     const envelope = { protocolVersion: 1, instanceId: this.instanceId, generation: ++this.generation, jobId: crypto.randomUUID(), type, payload } as Message<K>;
@@ -52,7 +52,7 @@ export class WorkerClient {
     const pending = this.pending;
     if (!pending || message.generation !== pending.envelope.generation || message.jobId !== pending.envelope.jobId) { closePayload(message); return; }
     if (message.type === 'ERROR') {
-      this.pending = null; pending.reject(failure(message.payload.code)); return;
+      this.pending = null; pending.reject(failure(message.payload.code,message.payload.diagnostic)); return;
     }
     if (message.type === pending.success) {
       this.pending = null; pending.resolve(message); return;

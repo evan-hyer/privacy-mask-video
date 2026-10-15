@@ -2,13 +2,14 @@ import type { CapabilityReport, ExportResult, Progress, LossReason } from '../co
 import type { ErrorCode } from '../core/errors';
 import { isErrorCode } from '../core/errors';
 import { validRect } from '../core/geometry';
+import { isDiagnostic, type Diagnostic } from '../core/diagnostics';
 import type { SourceVideo } from '../media/types';
 import type { TargetSelection } from '../vision/types';
 export interface ResidentWorkerAssets { models: { detector: Uint8Array; recognition: Uint8Array }; runtime: { mjs: string; wasm: string }; modelHashes: string[]; runtimeVersion: string }
 interface Payloads {
   INIT: ResidentWorkerAssets;
   LOAD: { file: File; sourceId: string };
-  RUN: { source: SourceVideo; selection: TargetSelection; emojiBitmap: ImageBitmap; settingsRevision: number };
+  RUN: { source: SourceVideo; selections: TargetSelection[]; emojiBitmap: ImageBitmap; settingsRevision: number };
   PREVIEW_ACK: { sequence: number };
   CANCEL: { reason: string };
   RESET: null;
@@ -20,7 +21,7 @@ interface Payloads {
   TRACKING: { status: 'acquired' | 'lost'; reason: LossReason | null; timestampUs: number };
   COMPLETE: ExportResult;
   CANCELED: null;
-  ERROR: { code: ErrorCode; message: string; recoverable: boolean };
+  ERROR: { code: ErrorCode; message: string; recoverable: boolean; diagnostic?: Diagnostic | undefined };
 }
 export type MessageType = keyof Payloads;
 export type Message<K extends MessageType = MessageType> = K extends MessageType ? { protocolVersion: 1; instanceId: string; generation: number; jobId: string; type: K; payload: Payloads[K] } : never;
@@ -42,7 +43,7 @@ export function isMessage(value: unknown): value is Message {
   switch(message.type) {
     case 'INIT':return object(payload.models) && payload.models.detector instanceof Uint8Array && payload.models.recognition instanceof Uint8Array && object(payload.runtime) && text(payload.runtime.mjs) && text(payload.runtime.wasm) && Array.isArray(payload.modelHashes) && payload.modelHashes.length===2 && payload.modelHashes.every(hash=>typeof hash==='string'&&/^[a-f0-9]{64}$/.test(hash)) && text(payload.runtimeVersion);
     case 'LOAD':return file(payload.file)&&text(payload.sourceId);
-    case 'RUN':return source(payload.source)&&object(payload.selection)&&text(payload.selection.sourceId)&&text(payload.selection.selectionId)&&validRect(payload.selection.initialRect)&&['detected','manual'].includes(payload.selection.kind as string)&&bitmap(payload.emojiBitmap)&&integer(payload.settingsRevision);
+    case 'RUN':return source(payload.source)&&Array.isArray(payload.selections)&&payload.selections.length>0&&payload.selections.length<=8&&payload.selections.every(selection=>object(selection)&&text(selection.sourceId)&&text(selection.selectionId)&&validRect(selection.initialRect)&&['detected','manual'].includes(selection.kind as string))&&new Set(payload.selections.map(selection=>selection.selectionId)).size===payload.selections.length&&bitmap(payload.emojiBitmap)&&integer(payload.settingsRevision);
     case 'PREVIEW_ACK':return integer(payload.sequence);
     case 'CANCEL':return ['user','replaced','settings','reset','disconnected'].includes(payload.reason as string);
     case 'READY':return payload.ready===true&&typeof payload.webCodecs==='boolean'&&typeof payload.offscreenCanvas==='boolean'&&typeof payload.wasm==='boolean'&&Array.isArray(payload.videoCodecs)&&payload.videoCodecs.every(text)&&Array.isArray(payload.audioCodecs)&&payload.audioCodecs.every(text);
@@ -50,8 +51,8 @@ export function isMessage(value: unknown): value is Message {
     case 'PROGRESS':return ['processing','finalizing'].includes(payload.stage as string)&&integer(payload.processedFrames)&&integer(payload.timestampUs)&&integer(payload.durationUs)&&(payload.ratio===null||typeof payload.ratio==='number'&&Number.isFinite(payload.ratio)&&payload.ratio>=0&&payload.ratio<1);
     case 'PREVIEW':return bitmap(payload.bitmap)&&integer(payload.sequence)&&integer(payload.timestampUs);
     case 'TRACKING':return integer(payload.timestampUs)&&(payload.status==='acquired'&&payload.reason===null||payload.status==='lost'&&lossReasons.has(payload.reason as string));
-    case 'COMPLETE':return payload.blob instanceof Blob&&text(payload.filename)&&/^[a-zA-Z0-9_.-]+$/.test(payload.filename)&&text(payload.mimeType)&&integer(payload.width)&&integer(payload.height)&&integer(payload.durationUs)&&integer(payload.frameCount)&&integer(payload.audioTrackCount)&&text(payload.sourceId)&&integer(payload.settingsRevision)&&Array.isArray(payload.lostIntervals)&&payload.lostIntervals.every(interval=>object(interval)&&integer(interval.startUs)&&integer(interval.endUs)&&(interval.endUs as number)>(interval.startUs as number)&&Array.isArray(interval.reasons)&&interval.reasons.every(reason=>lossReasons.has(reason)));
-    case 'ERROR':return isErrorCode(payload.code)&&text(payload.message)&&typeof payload.recoverable==='boolean';
+    case 'COMPLETE':return integer(payload.targetCount)&&(payload.targetCount as number)>0&&(payload.targetCount as number)<=8&&Array.isArray(payload.targetLosses)&&payload.targetLosses.length===payload.targetCount&&payload.targetLosses.every(target=>object(target)&&text(target.selectionId)&&Array.isArray(target.intervals)&&target.intervals.every(interval=>object(interval)&&integer(interval.startUs)&&integer(interval.endUs)&&(interval.endUs as number)>(interval.startUs as number)&&Array.isArray(interval.reasons)&&interval.reasons.every(reason=>lossReasons.has(reason))))&&payload.blob instanceof Blob&&text(payload.filename)&&/^[a-zA-Z0-9_.-]+$/.test(payload.filename)&&text(payload.mimeType)&&integer(payload.width)&&integer(payload.height)&&integer(payload.durationUs)&&integer(payload.frameCount)&&integer(payload.audioTrackCount)&&text(payload.sourceId)&&integer(payload.settingsRevision)&&Array.isArray(payload.lostIntervals)&&payload.lostIntervals.every(interval=>object(interval)&&integer(interval.startUs)&&integer(interval.endUs)&&(interval.endUs as number)>(interval.startUs as number)&&Array.isArray(interval.reasons)&&interval.reasons.every(reason=>lossReasons.has(reason)));
+    case 'ERROR':return isErrorCode(payload.code)&&text(payload.message)&&typeof payload.recoverable==='boolean'&&(payload.diagnostic===undefined||isDiagnostic(payload.diagnostic));
     default:return false;
   }
 }

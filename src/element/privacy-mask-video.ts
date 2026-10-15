@@ -87,6 +87,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
   get capabilities(): CapabilityReport | null { return this.capability ? snapshot(this.capability) : null; }
   get source(): SourceSummary | null { return this.session.source ? snapshot(this.session.source) : null; }
   get faces(): readonly FaceSummary[] { return snapshot(this.session.faces.map(({id,rect,landmarks,confidence}) => ({id,rect,landmarks,confidence}))); }
+  get selectedFaceIds(): readonly string[] { return snapshot(this.session.selections.flatMap(selection => selection.candidateId ? [selection.candidateId] : [])); }
   get result(): ExportResult | null { return this.session.result ? snapshot(this.session.result) : null; }
   attributeChangedCallback(name: string, oldValue: string | null, value: string | null): void {
     if (this.reflecting || oldValue === value) return;
@@ -161,19 +162,33 @@ export class PrivacyMaskVideoElement extends HTMLElement {
       this.session.source = {sourceId,displayWidth,displayHeight,durationUs,container,audioTrackCount}; this.session.faces = this.loaded.initialCandidates;
       await this.refreshEmoji(); this.assertOperation(operation);
       this.operation = null; this.setState('selecting');
-      this.status(this.session.faces.length ? 'Choose exactly one face below, click its boundary, or draw a rectangle.' : 'No faces detected. Draw a rectangle, use the numeric fields, or choose another video.');
+      this.status(this.session.faces.length ? 'Choose the faces to mask (up to 8). Tap each face below or its boundary.' : 'No faces detected. Draw a rectangle, use the numeric fields, or choose another video.');
       this.renderFaces(); this.drawInitial();
       this.emit('loaded',{sourceId,width:displayWidth,height:displayHeight,durationUs,faceCount:this.session.faces.length,audioTrackCount});
       return snapshot(this.session.source);
     } catch(error) { this.finishFailure(error,operation,'decode-failed'); throw (error as Error).name === 'AbortError' ? error : sanitized(error,'decode-failed'); }
   }
-  selectFace(candidateId: string): void {
-    const candidate = this.guard(() => {
-      this.requireEnabled(); if (this.operation?.kind === 'load') throw failure('invalid-state');
-      const face = this.session.faces.find(item => item.id === candidateId && item.sourceId === this.loaded?.sourceId);
-      if (!face) throw failure('invalid-selection'); return face;
+  selectFace(candidateId: string): void { this.selectFaces([candidateId]); }
+  selectFaces(candidateIds: readonly string[]): void {
+    const candidates = this.guard(() => {
+      this.requireEnabled(); if (!this.loaded || this.operation?.kind === 'load') throw failure('invalid-state');
+      if (!Array.isArray(candidateIds) || candidateIds.length > 8 || new Set(candidateIds).size !== candidateIds.length) throw failure('invalid-selection');
+      return candidateIds.map(id => {
+        const face = this.session.faces.find(item => item.id === id && item.sourceId === this.loaded!.sourceId);
+        if (!face) throw failure('invalid-selection'); return face;
+      });
     });
-    this.select({ ...candidate.rect },candidate.id,candidate.landmarks.map(point => ({...point})));
+    this.cancelOperation('settings'); this.invalidateResult();
+    this.session.selections = candidates.map(candidate => ({ selectionId:crypto.randomUUID(), sourceId:this.loaded!.sourceId,kind:'detected',candidateId:candidate.id,initialRect:{...candidate.rect},initialLandmarks:candidate.landmarks.map(point=>({...point})),initialRotationRad:rotation(candidate.landmarks) }));
+    this.setState(candidates.length ? 'selected' : 'selecting');
+    this.status(candidates.length ? candidates.length + ' face(s) selected. Tap a face to add or remove it, then process the video.' : 'Choose the faces you want to mask.');
+    this.renderFaces(); this.drawInitial();
+    const first = this.session.selection;
+    this.emit('selectionchange',{sourceId:this.loaded!.sourceId,selectionId:first?.selectionId ?? null,kind:first?.kind ?? null,candidateId:first?.candidateId ?? null,candidateIds:this.selectedFaceIds,selectionCount:candidates.length});
+  }
+  private toggleFace(candidateId: string): void {
+    const ids = this.selectedFaceIds;
+    this.selectFaces(ids.includes(candidateId) ? ids.filter(id=>id!==candidateId) : [...ids,candidateId]);
   }
   selectRegion(rect: Rect): void {
     const region = this.guard(() => {
@@ -187,22 +202,22 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     this.cancelOperation('settings'); this.invalidateResult();
     this.session.selection = {selectionId:crypto.randomUUID(),sourceId:this.loaded.sourceId,kind:candidateId ? 'detected' : 'manual',candidateId,initialRect:rect,initialLandmarks:landmarks,initialRotationRad:rotation(landmarks)};
     this.setState('selected'); this.status('Target selected. Adjust the emoji or process the video.'); this.renderFaces(); this.drawInitial();
-    this.emit('selectionchange',{sourceId:this.loaded.sourceId,selectionId:this.session.selection.selectionId,kind:this.session.selection.kind,candidateId});
+    this.emit('selectionchange',{sourceId:this.loaded.sourceId,selectionId:this.session.selection.selectionId,kind:this.session.selection.kind,candidateId,candidateIds:this.selectedFaceIds,selectionCount:1});
   }
   async process(): Promise<ExportResult> {
     const context = this.guard(() => {
       this.requireEnabled(); if (!this.loaded || !this.session.selection || this.operation || this.initialization) throw failure('invalid-state');
-      return { source:this.loaded, selection:structuredClone(this.session.selection) };
+      return { source:this.loaded, selections:structuredClone(this.session.selections) };
     });
     this.invalidateResult();
-    const operation = this.begin('process'); const { source,selection } = context; const emoji = this._emoji; const settingsRevision = this.session.settingsRevision;
+    const operation = this.begin('process'); const { source,selections } = context; const emoji = this._emoji; const settingsRevision = this.session.settingsRevision;
     this.ui<HTMLProgressElement>('progress').value=0;
     this.setState('processing'); this.status('Processing video locally…');
     try {
       await abortable(this.initialize(),operation.controller.signal); this.assertOperation(operation); this.setState('processing');
-      const bitmap = await emojiBitmap(emoji,this.assets!.fontFamily);
+      const bitmap = await emojiBitmap(emoji,this.assets!.emojiImages);
       try { this.assertOperation(operation); } catch(error) { bitmap.close(); throw error; }
-      const response = await this.client!.request('RUN',{source,selection,emojiBitmap:bitmap,settingsRevision},'COMPLETE',[bitmap]);
+      const response = await this.client!.request('RUN',{source,selections,emojiBitmap:bitmap,settingsRevision},'COMPLETE',[bitmap]);
       this.assertOperation(operation); if (response.type !== 'COMPLETE') throw failure('worker-failed');
       this.session.result = response.payload; this.operation = null;
       this.resultURL = URL.createObjectURL(response.payload.blob); this.ui<HTMLVideoElement>('review').src = this.resultURL;
@@ -264,7 +279,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
   private report(error: unknown, changeState: boolean, jobId: string | null = this.operation?.jobId ?? null): void {
     if(error&&typeof error==='object') { if(this.reportedErrors.has(error))return; this.reportedErrors.add(error); }
     const safe = sanitized(error,'invalid-configuration');
-    if (changeState) this.setState('error'); this.status(safe.message,true); this.emit('error',{code:safe.code,message:safe.message,recoverable:safe.recoverable,jobId}); this.updateControls();
+    if (changeState) this.setState('error'); this.status(safe.message,true); this.emit('error',{code:safe.code,message:safe.message,recoverable:safe.recoverable,jobId,diagnostic:'diagnostic' in safe ? safe.diagnostic : undefined}); this.updateControls();
   }
   private updateControls(): void {
     if (!this.shadowRoot) return;
@@ -284,7 +299,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     if (!this.assets || !this.capability) return;
     const emoji = this._emoji; const assets = this.assets;
     try {
-      const bitmap = await emojiBitmap(emoji,assets.fontFamily);
+      const bitmap = await emojiBitmap(emoji,assets.emojiImages);
       if (this._emoji !== emoji || this.assets !== assets || !this.isConnected) { bitmap.close(); return; }
       this.previewEmoji?.close(); this.previewEmoji = bitmap; this.drawInitial();
     } catch(error) { if (this.assets === assets && this.isConnected) this.report(error,false); }
@@ -293,24 +308,25 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     const container = this.ui('faces'); container.replaceChildren();
     this.session.faces.forEach((candidate,index) => {
       const button = document.createElement('button'); button.type = 'button'; button.textContent = `Face ${index+1}`; button.disabled = this.disabled;
-      button.setAttribute('aria-pressed',String(this.session.selection?.candidateId === candidate.id));
-      button.addEventListener('click',() => this.userAction(() => this.selectFace(candidate.id))); container.append(button);
+      button.setAttribute('aria-pressed',String(this.session.selections.some(selection=>selection.candidateId === candidate.id)));
+      button.addEventListener('click',() => this.userAction(() => this.toggleFace(candidate.id))); container.append(button);
     });
   }
   private drawInitial(draft?: Rect): void {
     if (!this.firstFrame || !this.loaded || this.operation?.kind === 'process') return;
     const canvas = this.ui<HTMLCanvasElement>('preview'); canvas.width = this.loaded.displayWidth; canvas.height = this.loaded.displayHeight;
     const context = canvas.getContext('2d')!; context.drawImage(this.firstFrame,0,0);
-    for (const face of this.session.faces) { context.strokeStyle = face.id === this.session.selection?.candidateId ? '#48ed95' : '#ffd54f'; context.lineWidth = Math.max(2,canvas.width/300); context.strokeRect(face.rect.x,face.rect.y,face.rect.width,face.rect.height); }
-    if (this.session.selection && this.previewEmoji) drawMask(context,this.session.selection.initialRect,this.session.selection.initialRotationRad,{emojiBitmap:this.previewEmoji,backingColor:'#ffd54f',paddingRatio:.12});
+    for (const face of this.session.faces) { context.strokeStyle = this.session.selections.some(selection=>selection.candidateId === face.id) ? '#48ed95' : '#ffd54f'; context.lineWidth = Math.max(2,canvas.width/300); context.strokeRect(face.rect.x,face.rect.y,face.rect.width,face.rect.height); }
+    if (this.previewEmoji) for (const selection of this.session.selections) drawMask(context,selection.initialRect,selection.initialRotationRad,{emojiBitmap:this.previewEmoji,backingColor:'#ffd54f',paddingRatio:.12});
     if (draft) { context.strokeStyle='#48ed95'; context.lineWidth=3; context.strokeRect(draft.x,draft.y,draft.width,draft.height); }
   }
   private renderLosses(): void {
     const result = this.session.result!; this.ui('review-section').hidden = false; this.ui('losses').replaceChildren();
     this.ui('loss-summary').textContent = result.lostIntervals.length ? 'Tracking was lost during these intervals. A held mask may not cover the intended face.' : 'No tracking loss was reported. Coverage still requires review.';
-    for (const interval of result.lostIntervals) {
+    const losses = result.targetLosses.flatMap((target,index)=>target.intervals.map(interval=>({interval,label:'Target '+(index+1)})));
+    for (const {interval,label} of losses) {
       const item = document.createElement('li'); const button = document.createElement('button'); button.type='button';
-      button.textContent=`${(interval.startUs/1e6).toFixed(2)}–${(interval.endUs/1e6).toFixed(2)} s: ${interval.reasons.map(reason=>LOSS_LABELS[reason]).join(', ')}`;
+      button.textContent=`${label}: ${(interval.startUs/1e6).toFixed(2)}–${(interval.endUs/1e6).toFixed(2)} s: ${interval.reasons.map(reason=>LOSS_LABELS[reason]).join(', ')}`;
       button.addEventListener('click',() => { this.ui<HTMLVideoElement>('review').currentTime=interval.startUs/1e6; }); item.append(button); this.ui('losses').append(item);
     }
   }
@@ -359,7 +375,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
       const rect=drawnRegion(start,end);
       if (rect.width < 3 && rect.height < 3) {
         const face=this.session.faces.find(face => end.x >= face.rect.x && end.y >= face.rect.y && end.x <= face.rect.x+face.rect.width && end.y <= face.rect.y+face.rect.height);
-        if (face) this.userAction(() => this.selectFace(face.id)); else this.drawInitial();
+        if (face) this.userAction(() => this.toggleFace(face.id)); else this.drawInitial();
       } else this.userAction(() => this.selectRegion(rect));
     });
     canvas.addEventListener('pointercancel',() => { this.drawStart=null; this.drawInitial(); });

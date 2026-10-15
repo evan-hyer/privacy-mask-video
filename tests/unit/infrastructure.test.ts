@@ -104,11 +104,13 @@ it('builds ESM/declarations/assets and one worker bundle using isolated tooling 
   await put(root, 'src/worker/extra.ts', 'export const value = 42;');
   await put(root, 'src/worker/pipeline.worker.ts', 'export async function probe() { return (await import("./extra")).value; }');
   await put(root, 'demo/index.html', '<script type="module" src="../define.js"></script>');
-  await put(root, 'assets/manifest.json', '{"toolingProbe":true}');
+  await put(root, 'assets/manifest.json', '{"toolingProbe":true,"entries":[]}');
   await put(root, 'THIRD_PARTY_NOTICES.txt', 'Tooling probe only');
+  await put(root, 'assets/unused.ttf', 'Legacy font must not ship');
   await cp(path.join(projectRoot, 'tsconfig.json'), path.join(root, 'tsconfig.json'));
   await buildDistribution(root);
   const output = path.join(root, 'dist');
+  await expect(readFile(path.join(output,'assets/unused.ttf'))).rejects.toMatchObject({code:'ENOENT'});
   for (const entry of ['index.js', 'define.js', 'index.d.ts', 'define.d.ts', 'workers/pipeline.worker.js', 'assets/manifest.json', 'demo/index.html', 'THIRD_PARTY_NOTICES.txt']) {
     expect((await readFile(path.join(output, entry))).length).toBeGreaterThan(0);
   }

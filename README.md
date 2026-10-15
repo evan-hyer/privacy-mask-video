@@ -1,6 +1,6 @@
 # Privacy Mask Video
 
-A native `<privacy-mask-video>` Web Component for choosing one face in a local
+A native `<privacy-mask-video>` Web Component for choosing up to eight faces in a local
 MP4/WebM video, covering it with an emoji, reviewing tracking losses, and
 downloading the result. No UI framework or consumer bundler is required.
 
@@ -11,7 +11,7 @@ browser compatibility, offline behavior, or performance. Review all output.
 
 ## npm package
 
-The release name is `privacy-mask-video`, version 0.1.0 (experimental).
+The release name is `privacy-mask-video`, version 0.1.1 (experimental).
 
 ```powershell
 npm install privacy-mask-video
@@ -19,7 +19,7 @@ npm install privacy-mask-video
 
 Copy node_modules/privacy-mask-video/dist/ in its entirety to a directory served
 on your origin, then use the ordinary HTML embedding example below. The package
-includes the worker, WASM, models, font, sequence manifest and third-party
+includes the worker, WASM, models, emoji PNGs, sequence manifest and third-party
 notices; installed consumers do not need to download resources from upstream.
 Asset and worker subpaths are exported for host tooling. Importing the component
 does not automatically copy static assets for a consuming bundler.
@@ -121,7 +121,8 @@ not appearance descriptors. result is null until finalization succeeds.
 | --- | --- |
 | initialize() | Initialize or retry local resources while connected; Promise of capability report. |
 | load(file) | Accept a positive-sized local File; await initialization, preflight export, show the first decoded frame and detectable candidates. Invalid arguments retain valid prior media; an accepted replacement cancels old work and clears old results. |
-| selectFace(id) | Select one current initial-frame candidate. Processing never starts automatically. |
+| selectFace(id) | Select one current initial-frame candidate, replacing the selection. Processing never starts automatically. |
+| selectFaces(ids) | Replace the selection with up to eight distinct current candidate IDs; an empty array clears it. |
 | selectRegion(rect) | Select a finite, positive rectangle entirely within the display-oriented source dimensions. |
 | process() | Process from the beginning with fresh identity state; Promise of a finalized ExportResult. Concurrent process calls reject. |
 | cancel() | Abort active work and reject its promise with AbortError; retain source/selection after processing cancellation. A worker that has not acknowledged within 250 ms is terminated. |
@@ -150,6 +151,10 @@ snapshots, without input Files, image payloads, embeddings, or private stack dat
 | pmv-cancel | jobId, reason |
 | pmv-error | code, message, recoverable, jobId |
 
+The selectedFaceIds getter returns a defensive snapshot of selected detected-face IDs. Face buttons and preview taps toggle selection; selectFace(id) retains its exclusive-selection API behavior. Manual selection replaces detected-face selections. Export results include targetCount and per-target targetLosses alongside the aggregate lostIntervals.
+
+Error detail optionally includes a diagnostic with a fixed stage/reason, known public resource path and HTTP status. It never includes raw exceptions, file names, URLs, media or embeddings. The component itself sends no telemetry.
+
 State changes precede their associated events. Complete is emitted after the
 result becomes accessible and before process() resolves. Stale replies are
 discarded and transferred bitmaps closed. Status text distinguishes file
@@ -168,7 +173,7 @@ fixed ordering/thresholds and a frozen within-clip appearance reference. YuNet
 detects every frame; ambiguous matching becomes loss with held geometry.
 Manual targets use a fixed grayscale correlation template. Brief local recovery
 is conservative; longer disappearance without an appearance anchor remains
-lost. No named-person lookup or remote face processing is used.
+lost. Each selected face has its own frozen reference and tracker. Competing claims on one detected face are treated as ambiguous for both targets and retain their previous geometry. No named-person lookup or remote face processing is used.
 
 An opaque circular backing encloses the tracked rectangle, including when the
 emoji has transparent margins. This establishes coverage of the estimate; it
@@ -194,13 +199,13 @@ tracks, unusable timing, changing dimensions and unsupported codecs are rejected
 
 ## Hosting and assets
 
-Serve over HTTPS or localhost with correct module, WASM, font and media MIME
+Serve over HTTPS or localhost with correct module, WASM, PNG and media MIME
 types. file:// hosting is unsupported. The host needs module workers,
-OffscreenCanvas 2D, WebCodecs, WebAssembly/SIMD and FontFace support. No browser
+OffscreenCanvas 2D, WebCodecs, WebAssembly/SIMD and PNG ImageBitmap support. No browser
 has completed qualification yet; capability probes determine actual routes.
 
-All fixed processing resources load from the host origin before ready. The
-component retains verified model data, font, worker and runtime Blob URLs for
+All fixed processing resources load from the host origin before ready. Emoji images replace the CBDT/CBLC font that Apple renderers cannot load; no downloadable font is required. The
+component retains verified model data, emoji images, worker and runtime Blob URLs for
 offline retries while connected. Disconnect releases them. Offline page reload
 is outside scope. No service worker, upload API, analytics or persistent media
 store is installed. The trusted host page can access local results; Shadow DOM
@@ -208,8 +213,8 @@ provides style encapsulation rather than a security boundary.
 
 A restrictive CSP must permit initial same-origin assets, Blob workers and Blob
 module imports, WASM compilation (wasm-unsafe-eval where applicable), component
-inline shadow styles, Blob font loading and Blob review media. Appropriate
-directives include script-src, worker-src, connect-src, style-src, font-src and
+inline shadow styles and Blob review media. Appropriate
+directives include script-src, worker-src, connect-src, style-src and
 media-src. The component never changes CSP. COOP/COEP are not required for its
 single-thread runtime.
 
@@ -232,8 +237,7 @@ npm run typecheck
 npm run build
 ```
 
-Testing was deferred on 2026-10-14. Existing npm test validates setup tooling
-only, not this component. Browser, privacy, performance, repeatability, codec,
+Testing was deferred on 2026-10-14. Existing npm test covers setup tooling, diagnostic sanitization and multi-target conflict resolution. It does not qualify tracking accuracy. Browser, privacy, performance, repeatability, codec,
 audio/timing, reference-alignment and per-frame face-coverage testing remain
 deferred, as do real fixture acquisition and profile calibration. These tasks
 are unchecked in specs/001-local-video-privacy-mask/tasks.md. Explicit browser

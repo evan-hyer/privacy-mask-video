@@ -19,8 +19,11 @@ assets/models/*.onnx
 assets/runtime/*.wasm
 assets/runtime/*.mjs
 assets/emoji/*.ttf
+assets/emoji/*.png
 # Local video fixtures must never be committed accidentally.
 tests/fixtures/**/*.mp4
 tests/fixtures/**/*.webm
 tests/fixtures/**/*.mov
 tests/fixtures/**/*.mkv
+
+pack.json

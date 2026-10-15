@@ -1,6 +1,7 @@
 import { env, InferenceSession } from 'onnxruntime-web/wasm';
 import type { ResidentWorkerAssets } from '../worker/protocol';
-import { failure } from '../core/errors';
+import { failure, diagnosed } from '../core/errors';
+import { diagnosticReason } from '../core/diagnostics';
 export interface VisionRuntime { detector: InferenceSession; recognition: InferenceSession; release: () => Promise<void> }
 export async function initializeVision(assets: ResidentWorkerAssets): Promise<VisionRuntime> {
   if (assets.runtimeVersion !== '1.30.0' || !assets.runtime.mjs.startsWith('blob:') || !assets.runtime.wasm.startsWith('blob:') || !(assets.models.detector instanceof Uint8Array) || !(assets.models.recognition instanceof Uint8Array)) throw failure('asset-integrity-failed');
@@ -9,10 +10,13 @@ export async function initializeVision(assets: ResidentWorkerAssets): Promise<Vi
   env.wasm.wasmPaths = { mjs: assets.runtime.mjs, wasm: assets.runtime.wasm };
   env.logLevel = 'fatal';
   const options: InferenceSession.SessionOptions = { executionProviders: ['wasm'], executionMode: 'sequential', graphOptimizationLevel: 'all', logSeverityLevel: 4 };
-  const detector = await InferenceSession.create(assets.models.detector, options);
+  let detector: InferenceSession;
+  try { detector = await InferenceSession.create(assets.models.detector, options); }
+  catch(error) { throw diagnosed(error,'asset-load-failed',{stage:'detector',reason:diagnosticReason(error),resource:'models/face_detection_yunet_2023mar.onnx'}); }
   let recognition: InferenceSession | null = null;
   try {
-    recognition = await InferenceSession.create(assets.models.recognition, options);
+    try { recognition = await InferenceSession.create(assets.models.recognition, options); }
+    catch(error) { throw diagnosed(error,'asset-load-failed',{stage:'recognizer',reason:diagnosticReason(error),resource:'models/face_recognition_sface_2021dec.onnx'}); }
     const check = (session: InferenceSession, name: string, dimensions: number[]): void => {
       const input = session.inputMetadata[0];
       if (session.inputNames.length !== 1 || session.inputNames[0] !== name || !input || !input.isTensor || JSON.stringify(input.shape) !== JSON.stringify(dimensions)) throw failure('asset-integrity-failed');

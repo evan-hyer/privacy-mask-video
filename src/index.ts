@@ -1,6 +1,7 @@
 import { PrivacyMaskVideoElement } from './element/privacy-mask-video';
 export { PrivacyMaskVideoElement };
 export { PrivacyMaskError, PrivacyMaskConfigurationError } from './core/errors';
+export type { Diagnostic } from './core/diagnostics';
 export type { ErrorCode } from './core/errors';
 export type { CapabilityReport, ComponentState, ExportResult, FaceSummary, LossInterval, LossReason, Point, Progress, Rect, SourceSummary } from './core/types';
 export function definePrivacyMaskVideo(): void {

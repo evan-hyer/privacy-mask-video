@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { verifyAssets } from './verify-assets.mjs';
-import { projectRoot, sha256 } from './integrity.mjs';
+import { projectRoot, sha256, containedPath } from './integrity.mjs';
 
 export async function buildDistribution(root = projectRoot) {
   // Missing source entries are a failure, never an empty successful distribution.
@@ -45,9 +45,14 @@ export async function buildDistribution(root = projectRoot) {
   const declarations = spawnSync(process.execPath, [tsc, '--project', path.join(root, 'tsconfig.json'), '--emitDeclarationOnly', '--outDir', output], { stdio: 'inherit' });
   if (declarations.status !== 0) throw new Error('Declaration generation failed');
   await mkdir(output, { recursive: true });
-  await cp(path.join(root, 'assets'), path.join(output, 'assets'), { recursive: true });
+  const manifest = JSON.parse(await readFile(path.join(root,'assets/manifest.json'),'utf8'));
+  await mkdir(path.join(output,'assets'),{recursive:true});
+  for (const entry of manifest.entries) {
+    const destination = containedPath(path.join(output,'assets'),entry.path);
+    await mkdir(path.dirname(destination),{recursive:true});
+    await cp(containedPath(path.join(root,'assets'),entry.path),destination);
+  }
   const manifestPath = path.join(output,'assets/manifest.json');
-  const manifest = JSON.parse(await readFile(manifestPath,'utf8'));
   const workerBytes = await readFile(path.join(output,'workers/pipeline.worker.js'));
   manifest.worker = { size:workerBytes.length,sha256:sha256(workerBytes) };
   await writeFile(manifestPath,JSON.stringify(manifest,null,2)+'\n');
