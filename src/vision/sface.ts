@@ -31,15 +31,19 @@ export function alignFace(image: ImageData, landmarks: readonly Point[]): Float3
   return data;
 }
 export class SFace {
+  private image: ImageData | null = null;
+  private descriptions = new WeakMap<readonly Point[], Float32Array>();
   constructor(private session: InferenceSession) {}
   async describe(image: ImageData,landmarks: readonly Point[]): Promise<Float32Array> {
+    if(this.image!==image) {this.image=image;this.descriptions=new WeakMap();}
+    const cached=this.descriptions.get(landmarks);if(cached)return cached;
     const tensor=new Tensor('float32',alignFace(image,landmarks),[1,3,112,112]);
     const outputs=await this.session.run({data:tensor}).finally(()=>tensor.dispose());
     try {
       const output=outputs[this.session.outputNames[0]!]!; const values=output.data as Float32Array;
       let squared=0; for(const value of values) squared+=value*value;
       const norm=Math.sqrt(squared); if(!Number.isFinite(norm)||norm<1e-8) throw failure('tracking-failed');
-      return Float32Array.from(values,value=>value/norm);
+      const description=Float32Array.from(values,value=>value/norm);this.descriptions.set(landmarks,description);return description;
     } finally { for(const output of Object.values(outputs)) output.dispose(); }
   }
 }

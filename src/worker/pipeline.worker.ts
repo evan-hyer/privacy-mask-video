@@ -6,7 +6,7 @@ import type { VisionRuntime } from '../vision/runtime';
 import type { FrameTrackingResult } from '../vision/types';
 import { failure, sanitized, diagnosed, abortError } from '../core/errors';
 import { validRect, validateRegion } from '../core/geometry';
-import { openVideo, initialFrame } from '../media/input';
+import { openVideo } from '../media/input';
 import type { OpenVideo } from '../media/input';
 import { negotiate, ExportWriter, outputFilename } from '../media/output';
 import type { SourceVideo } from '../media/types';
@@ -15,11 +15,13 @@ import { toUs, frameTime } from '../media/timeline';
 import { YuNet } from '../vision/yunet';
 import { SFace, imagePixels } from '../vision/sface';
 import { Association } from '../vision/association';
+import { FaceDiscovery } from '../vision/discovery';
 import { resolveTrackingConflicts } from '../vision/multi-target';
 import { PROFILE, profileHash } from '../vision/profile';
 import { LossCollector } from '../vision/loss';
 import { drawMask } from '../render/mask';
 import { PreviewGate } from '../render/preview';
+import { faceColor } from '../element/face-colors';
 import { canEncodeVideo, canEncodeAudio } from 'mediabunny';
 declare const self: DedicatedWorkerGlobalScope;
 let runtime:VisionRuntime|null=null;
@@ -37,12 +39,33 @@ async function load(request:Message<'LOAD'>):Promise<void> {
   const media=await openVideo(request.payload.file);
   try {
     check(); const route=await negotiate(media); check();
-    const frame=await initialFrame(media); check();
-    const candidates=await new YuNet(runtime.detector).detect(frame.canvas,request.payload.sourceId); check();
-    const bitmap=await createImageBitmap(frame.canvas);
-    if(canceled) {bitmap.close();check();}
-    const source:SourceVideo={sourceId:request.payload.sourceId,file:request.payload.file,displayWidth:media.width,displayHeight:media.height,durationUs:media.durationUs,container:media.container,audioTrackCount:media.audio.length,timelineOriginUs:media.originUs,videoTrack:media.videoDescriptor,audioTracks:media.audioDescriptors,initialFrameTimeUs:toUs(frame.timestamp)-media.originUs,initialCandidates:candidates,outputRoute:route};
-    reply(request,'LOADED',{source,bitmap},[bitmap]);
+    const detector=new YuNet(runtime.detector),recognizer=new SFace(runtime.recognition),discovery=new FaceDiscovery();
+    let bitmap:ImageBitmap|null=null,initialFrameTimeUs=0,count=0,lastProgress=-Infinity;
+    try {
+      for await(const frame of media.sink.canvases()) {
+        check(); const timestampUs=toUs(frame.timestamp)-media.originUs;
+        if(!bitmap) {bitmap=await createImageBitmap(frame.canvas);initialFrameTimeUs=timestampUs;}
+        const faces=await detector.detect(frame.canvas,request.payload.sourceId); check();
+        const embeddings:Float32Array[]=[];
+        if(faces.length) {
+          const image=imagePixels(frame.canvas);
+          for(const face of faces) {embeddings.push(await recognizer.describe(image,face.landmarks));check();}
+        }
+        for(const face of discovery.observe(faces,embeddings,timestampUs)) {
+          const crop=new OffscreenCanvas(96,96),context=crop.getContext('2d')!;
+          const size=Math.max(face.rect.width,face.rect.height)*1.3;
+          context.drawImage(frame.canvas,face.rect.x+(face.rect.width-size)/2,face.rect.y+(face.rect.height-size)/2,size,size,0,0,96,96);
+          face.thumbnail=await crop.convertToBlob({type:'image/jpeg',quality:.8});check();
+        }
+        count++;
+        const now=performance.now();
+        if(now-lastProgress>=500) {lastProgress=now;reply(request,'PROGRESS',{stage:'scanning',processedFrames:count,timestampUs,durationUs:media.durationUs,ratio:Math.min(.99,(timestampUs+toUs(frame.duration))/media.durationUs)});}
+        await new Promise<void>(resolve=>setTimeout(resolve,0));
+      }
+      if(!bitmap) throw failure('no-valid-frame'); check();
+      const source:SourceVideo={sourceId:request.payload.sourceId,file:request.payload.file,displayWidth:media.width,displayHeight:media.height,durationUs:media.durationUs,container:media.container,audioTrackCount:media.audio.length,timelineOriginUs:media.originUs,videoTrack:media.videoDescriptor,audioTracks:media.audioDescriptors,initialFrameTimeUs,initialCandidates:discovery.faces,outputRoute:route};
+      reply(request,'LOADED',{source,bitmap},[bitmap]);bitmap=null;
+    } finally {bitmap?.close();}
   } finally {media.input.dispose();}
 }
 async function run(request:Message<'RUN'>):Promise<void> {
@@ -76,19 +99,20 @@ async function run(request:Message<'RUN'>):Promise<void> {
       const image=imagePixels(frame.canvas);
       if(frameCount===0) for(const association of associations)await association.initialize(image);
       const faces=await detector.detect(frame.canvas,source.sourceId); check();
+      const active=associations.flatMap((association,index)=>timing.timestampUs>=(selections[index]!.firstSeenUs ?? source.initialFrameTimeUs)?[{association,index}]:[]);
       const proposed:FrameTrackingResult[]=[];
-      for(const association of associations) {proposed.push(await association.track(image,faces,frameCount,timing.timestampUs,timing.durationUs,false));check();}
-      const trackings=resolveTrackingConflicts(proposed,associations);
+      for(const {association} of active) {proposed.push(await association.track(image,faces,frameCount,timing.timestampUs,timing.durationUs,false));check();}
+      const trackings=resolveTrackingConflicts(proposed,active.map(target=>target.association));
       context.drawImage(frame.canvas,0,0);
-      trackings.forEach((tracking,index)=>{associations[index]!.commit(tracking);targetLosses[index]!.append(tracking);drawMask(context,tracking.rect,tracking.rotationRad,{emojiBitmap,backingColor:PROFILE.backing,paddingRatio:PROFILE.coveragePadding});});
-      const tracking=trackings.find(tracking=>tracking.status==='lost') ?? trackings[0]!;
-      losses.append(tracking);
+      trackings.forEach((tracking,index)=>{const target=active[index]!;target.association.commit(tracking);targetLosses[target.index]!.append(tracking);const colorIndex=source.initialCandidates.findIndex(face=>face.id===selections[target.index]!.candidateId);drawMask(context,tracking.rect,tracking.rotationRad,{emojiBitmap,backingColor:colorIndex>=0?faceColor(colorIndex).value:PROFILE.backing,paddingRatio:PROFILE.coveragePadding});});
+      const tracking=trackings.find(tracking=>tracking.status==='lost') ?? trackings[0];
+      if(tracking)losses.append(tracking);
       await writer.add(timing.timestampUs,timing.durationUs); check();
       endUs=timing.timestampUs+timing.durationUs;
       await audio.advance(endUs,check); check();
       frameCount++; previousTime=timing.timestampUs;
-      const trackingKey=`${tracking.status}:${tracking.reason}`;
-      if(lastTracking!==trackingKey) {lastTracking=trackingKey;reply(request,'TRACKING',{status:tracking.status,reason:tracking.reason,timestampUs:timing.timestampUs});}
+      const trackingKey=tracking?`${tracking.status}:${tracking.reason}`:'waiting';
+      if(tracking && lastTracking!==trackingKey) {lastTracking=trackingKey;reply(request,'TRACKING',{status:tracking.status,reason:tracking.reason,timestampUs:timing.timestampUs});}
       const now=performance.now();
       if(now-lastProgress>=500) {lastProgress=now;reply(request,'PROGRESS',{stage:'processing',processedFrames:frameCount,timestampUs:timing.timestampUs,durationUs:source.durationUs,ratio:Math.min(.98,endUs/source.durationUs*.98)});}
       const sequence=previews.next(now);
