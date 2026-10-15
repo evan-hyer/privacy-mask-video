@@ -1,7 +1,7 @@
 # Privacy Mask Video
 
 A native `<privacy-mask-video>` Web Component for choosing up to eight faces in a local
-MP4/WebM video, covering it with an emoji, reviewing tracking losses, and
+MOV/MP4/WebM video, covering it with an emoji, reviewing tracking losses, and
 downloading the result. No UI framework or consumer bundler is required.
 
 Implementation is available. **Runtime testing and qualification are deferred
@@ -11,7 +11,7 @@ browser compatibility, offline behavior, or performance. Review all output.
 
 ## npm package
 
-The release name is `privacy-mask-video`, version 0.1.1 (experimental).
+The release name is `privacy-mask-video`, version 0.1.2 (experimental).
 
 ```powershell
 npm install privacy-mask-video
@@ -246,3 +246,17 @@ manufacture a passing result.
 
 See specs/001-local-video-privacy-mask/validation/final.md for the implementation
 mapping, actual compilation/build results and deferred qualification work.
+
+### iPhone MOV input
+
+QuickTime MOV, MP4 and WebM are recognized from their contents, including files
+with a missing or inaccurate MIME type. MOV uses the same local pipeline and
+outputs MP4 or WebM; input rotation is applied before face selection and masking.
+H.264 and HEVC/H.265 input require a decoder available through the browser
+WebCodecs API. MOV support does not guarantee ProRes, HDR/Dolby Vision, cinematic
+auxiliary tracks or every HEVC profile. One video track and the existing 1080p,
+256 MiB and 10 minute limits apply. For compatibility, record in H.264 at 1080p
+(Camera > Formats > Most Compatible and Camera > Record Video). Changing that
+setting affects new recordings, not existing files. Input failures include a
+fixed diagnostic reason for container, video tracks, video codec, audio codec
+or timing; no filename, codec description, metadata or raw exception is logged.

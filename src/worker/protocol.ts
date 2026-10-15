@@ -32,7 +32,7 @@ const text=(value:unknown):value is string => typeof value==='string' && value.l
 const bitmap=(value:unknown):value is ImageBitmap => typeof ImageBitmap!=='undefined' && value instanceof ImageBitmap;
 const file=(value:unknown):value is File => typeof File!=='undefined' && value instanceof File && value.size>0;
 const lossReasons=new Set(['no-candidate','ambiguous','occluded-or-out-of-frame','weak-manual-match']);
-const source=(value:unknown):boolean => object(value) && text(value.sourceId) && file(value.file) && integer(value.displayWidth) && (value.displayWidth as number)>0 && integer(value.displayHeight) && (value.displayHeight as number)>0 && integer(value.durationUs) && (value.durationUs as number)>0 && integer(value.audioTrackCount) && ['mp4','webm'].includes(value.container as string) && Array.isArray(value.initialCandidates) && object(value.outputRoute);
+const source=(value:unknown):boolean => object(value) && text(value.sourceId) && file(value.file) && integer(value.displayWidth) && (value.displayWidth as number)>0 && integer(value.displayHeight) && (value.displayHeight as number)>0 && integer(value.durationUs) && (value.durationUs as number)>0 && integer(value.audioTrackCount) && ['mp4','mov','webm'].includes(value.container as string) && Array.isArray(value.initialCandidates) && object(value.outputRoute);
 export function isMessage(value: unknown): value is Message {
   if (!value || typeof value !== 'object') return false;
   const message = value as Record<string, unknown>;

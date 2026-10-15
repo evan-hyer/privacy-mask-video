@@ -1,6 +1,6 @@
 import { EMOJIS, emojiResource } from './configuration';
 export const diagnosticStages = ['platform', 'manifest', 'assets', 'worker', 'runtime', 'detector', 'recognizer', 'emoji', 'decode', 'encode'] as const;
-export const diagnosticReasons = ['network', 'http', 'integrity', 'decode', 'wasm-compile', 'memory', 'unsupported', 'initialization', 'worker'] as const;
+export const diagnosticReasons = ['network', 'http', 'integrity', 'decode', 'wasm-compile', 'memory', 'unsupported', 'initialization', 'worker', 'container', 'video-tracks', 'video-codec', 'audio-codec', 'timing'] as const;
 const resources = new Set(['manifest.json','workers/pipeline.worker.js','models/face_detection_yunet_2023mar.onnx','models/face_recognition_sface_2021dec.onnx','runtime/ort-wasm-simd-threaded.mjs','runtime/ort-wasm-simd-threaded.wasm','emoji/sequences.json',...EMOJIS.map(emojiResource)]);
 export interface Diagnostic { stage: typeof diagnosticStages[number]; reason: typeof diagnosticReasons[number]; resource?: string; httpStatus?: number }
 export function diagnosticReason(error: unknown): Diagnostic['reason'] {

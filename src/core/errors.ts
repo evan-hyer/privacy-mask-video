@@ -2,8 +2,8 @@ export type ErrorCode = 'unsupported-platform' | 'invalid-file' | 'unsupported-i
 import type { Diagnostic } from './diagnostics';
 const messages: Record<ErrorCode, string> = {
   'unsupported-platform': 'Use a browser with local video codecs, module workers and WebAssembly on HTTPS or localhost.',
-  'invalid-file': 'Choose a nonempty local MP4 or WebM video file.',
-  'unsupported-input': 'This video’s tracks, dimensions or codecs are unsupported. Try another MP4 or WebM video.',
+  'invalid-file': 'Choose a nonempty local MOV, MP4 or WebM video file.',
+  'unsupported-input': 'This video format, tracks or codec cannot be read by this browser. Try a MOV or MP4 with H.264 video, or a WebM video.',
   'decode-failed': 'The video could not be decoded. Try another file.',
   'no-valid-frame': 'This video contains no usable video frame.',
   'asset-load-failed': 'Processing resources could not be loaded. Check the installation and retry initialization.',
@@ -20,7 +20,17 @@ const messages: Record<ErrorCode, string> = {
 };
 export class PrivacyMaskError extends Error {
   readonly recoverable = true;
-  constructor(readonly code: ErrorCode, readonly diagnostic?: Diagnostic) { super(messages[code]); this.name = code === 'invalid-state' ? 'InvalidStateError' : code.startsWith('invalid-') ? 'TypeError' : 'PrivacyMaskError'; }
+  constructor(readonly code: ErrorCode, readonly diagnostic?: Diagnostic) {
+    const inputMessages:Partial<Record<Diagnostic['reason'],string>>={
+      container:'This file is not a readable MOV, MP4 or WebM video. Renaming its extension does not convert it.',
+      'video-tracks':'Choose a MOV, MP4 or WebM with exactly one video track. This file has no video track or multiple video tracks.',
+      'video-codec':'This browser cannot decode this video codec. Try H.264 video in MOV or MP4; HEVC support depends on your browser.',
+      'audio-codec':'This browser cannot read an audio track in this video. Try a MOV or MP4 with AAC audio.',
+      timing:'This video has unsupported or invalid track timing. Try exporting a new MOV, MP4 or WebM.',
+    };
+    super(code==='unsupported-input' && diagnostic ? inputMessages[diagnostic.reason] ?? messages[code] : messages[code]);
+    this.name = code === 'invalid-state' ? 'InvalidStateError' : code.startsWith('invalid-') ? 'TypeError' : 'PrivacyMaskError';
+  }
 }
 export class PrivacyMaskConfigurationError extends TypeError {
   readonly recoverable=true;
