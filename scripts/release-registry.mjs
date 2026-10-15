@@ -1,6 +1,7 @@
 import { readFile, appendFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { waitForRegistryVersion } from './registry-visibility.mjs';
 
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const tag = `v${pkg.version}`;
@@ -20,7 +21,7 @@ if (process.argv[2] === 'prepare') {
 } else if (process.argv[2] === 'publish') {
   const url = `https://registry.npmjs.org/${encodeURIComponent(pkg.name)}/${pkg.version}`;
   async function registryVersion() {
-    const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000), cache: 'no-store' });
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`Registry lookup failed: ${response.status}`);
     return response.json();
@@ -38,7 +39,7 @@ if (process.argv[2] === 'prepare') {
   if (!published) {
     const result = spawnSync('npm', ['publish', `./${pack.filename}`, '--access', 'public', '--provenance', '--ignore-scripts', '--fetch-retries=0', '--fetch-timeout=300000'], { stdio: 'inherit' });
     if (result.status !== 0) throw new Error('npm publication failed');
-    published = await registryVersion();
+    published = await waitForRegistryVersion(registryVersion);
   }
   if (published?.dist?.integrity !== integrity) throw new Error('Published version does not match this archive');
   console.log(`Verified ${pkg.name}@${pkg.version} registry integrity`);
