@@ -3,7 +3,7 @@ export function template(): string {
   return `<style>${styles}</style><main part="container">
   <h2>Mask faces in your video</h2><p>Choose one or more faces, cover them with an emoji, and save a new video. Tap a selected face again to remove it.</p>
   <small>Processing runs on this device. Audio is preserved and remains unchanged.</small>
-  <label class="drop" part="drop-zone">Choose or drop a local MP4 or WebM<input id="file" type="file" accept="video/mp4,video/webm,.mp4,.webm"></label>
+  <label class="drop" part="drop-zone">Choose or drop a local MOV, MP4 or WebM<input id="file" type="file" accept="video/quicktime,video/mp4,video/webm,.mov,.mp4,.webm"></label>
   <div class="status" id="status" part="status">Initializing local processing…</div><p id="announce" class="sr-only" role="status" aria-live="polite" aria-atomic="true">Initializing local processing…</p>
   <div class="preview" part="preview"><canvas id="preview" width="640" height="360" aria-label="Video preview. Choose a face below or draw a rectangle."></canvas></div>
   <div class="faces" id="faces" part="face-list" role="group" aria-label="Detected faces"></div>

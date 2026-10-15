@@ -2,7 +2,7 @@ export interface Point { x: number; y: number }
 export interface Rect extends Point { width: number; height: number }
 export type ComponentState = 'disconnected' | 'initializing' | 'empty' | 'loading' | 'selecting' | 'selected' | 'processing' | 'finalizing' | 'complete' | 'error';
 export interface CapabilityReport { ready: boolean; webCodecs: boolean; offscreenCanvas: boolean; wasm: boolean; videoCodecs: readonly string[]; audioCodecs: readonly string[] }
-export interface SourceSummary { sourceId: string; displayWidth: number; displayHeight: number; durationUs: number; container: 'mp4' | 'webm'; audioTrackCount: number }
+export interface SourceSummary { sourceId: string; displayWidth: number; displayHeight: number; durationUs: number; container: 'mp4' | 'mov' | 'webm'; audioTrackCount: number }
 export interface FaceSummary { id: string; rect: Rect; landmarks: readonly Point[]; confidence: number }
 export type LossReason = 'no-candidate' | 'ambiguous' | 'occluded-or-out-of-frame' | 'weak-manual-match';
 export interface LossInterval { startUs: number; endUs: number; reasons: LossReason[] }

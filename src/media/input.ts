@@ -1,4 +1,4 @@
-import { Input, BlobSource, MP4, WEBM, VideoSampleSink } from 'mediabunny';
+import { Input, BlobSource, MP4, QTFF, WEBM, VideoSampleSink } from 'mediabunny';
 import type { InputVideoTrack, InputAudioTrack, WrappedCanvas, Rotation } from 'mediabunny';
 import { failure, sanitized } from '../core/errors';
 import { validateFile, validateMedia } from '../core/limits';
@@ -27,25 +27,32 @@ class ValidatedCanvasSink {
     }
   }
 }
-export interface OpenVideo { input:Input; video:InputVideoTrack; audio:InputAudioTrack[]; sink:ValidatedCanvasSink; width:number; height:number; durationUs:number; originUs:number; container:'mp4'|'webm'; videoDescriptor:TrackDescriptor; audioDescriptors:TrackDescriptor[] }
+export interface OpenVideo { input:Input; video:InputVideoTrack; audio:InputAudioTrack[]; sink:ValidatedCanvasSink; width:number; height:number; durationUs:number; originUs:number; container:'mp4'|'mov'|'webm'; videoDescriptor:TrackDescriptor; audioDescriptors:TrackDescriptor[] }
 export async function openVideo(file:File):Promise<OpenVideo> {
   validateFile(file);
-  const input=new Input({source:new BlobSource(file),formats:[MP4,WEBM]});
+  // Inspect the bytes rather than trusting the filename/MIME supplied by Photos.
+  const input=new Input({source:new BlobSource(file),formats:[MP4,QTFF,WEBM]});
+  let reason:'container'|'video-tracks'|'video-codec'|'audio-codec'|'timing'='container';
   try {
-    const format=await input.getFormat(); const container=format===MP4?'mp4':format===WEBM?'webm':null;
+    const format=await input.getFormat(); const container=format===MP4?'mp4':format===QTFF?'mov':format===WEBM?'webm':null;
     if(!container) throw failure('unsupported-input');
+    reason='video-tracks';
     const videoTracks=await input.getVideoTracks(),audio=await input.getAudioTracks();
     if(videoTracks.length!==1) throw failure('unsupported-input');
     const video=videoTracks[0]!;
+    reason='video-codec';
     const config=await video.getDecoderConfig();
     if(!config || !await video.canDecode()) throw failure('unsupported-input');
     const width=await video.getDisplayWidth(),height=await video.getDisplayHeight();
     const descriptors:TrackDescriptor[]=[];
+    reason='timing';
     const first=toUs(await video.getFirstTimestamp()); const end=toUs(await video.computeDuration());
     const videoDescriptor={codec:(await video.getCodec())??'',config,firstTimestampUs:first,endTimestampUs:end};
     for(const track of audio) {
+      reason='audio-codec';
       const audioConfig=await track.getDecoderConfig(),codec=await track.getCodec();
       if(!audioConfig || !codec) throw failure('unsupported-input');
+      reason='timing';
       descriptors.push({codec,config:audioConfig,firstTimestampUs:toUs(await track.getFirstTimestamp()),endTimestampUs:toUs(await track.computeDuration())});
     }
     const originUs=Math.min(first,...descriptors.map(track=>track.firstTimestampUs));
@@ -53,7 +60,7 @@ export async function openVideo(file:File):Promise<OpenVideo> {
     validateMedia(width,height,durationUs);
     if(end<=first || descriptors.some(track=>track.endTimestampUs<=track.firstTimestampUs)) throw failure('unsupported-input');
     return {input,video,audio,sink:new ValidatedCanvasSink(video,width,height,await video.getRotation(),await video.getFlip()),width,height,durationUs,originUs,container,videoDescriptor,audioDescriptors:descriptors};
-  } catch(error) { input.dispose(); throw sanitized(error,'unsupported-input'); }
+  } catch(error) { input.dispose(); const safe=sanitized(error,'unsupported-input'); throw safe.code==='unsupported-input'?failure(safe.code,{stage:'decode',reason}):safe; }
 }
 export async function initialFrame(media:OpenVideo):Promise<WrappedCanvas> {
   const iterator=media.sink.canvases();
