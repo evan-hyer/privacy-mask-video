@@ -37,10 +37,19 @@ creates the GitHub prerelease with an explicit npm-pending note. After approval,
 the archive checksum can be compared with npm's `dist.integrity`; update the
 release note to reflect confirmed publication.
 
-Initial publishing uses the encrypted `NPM_TOKEN` repository secret. Configure
-npm trusted publishing for owner `evan-hyer`, repository `privacy-mask-video`,
-workflow `release.yml`, with direct publication allowed, then remove that secret
-to use short-lived OIDC credentials. See
+Publishing uses short-lived GitHub OIDC credentials; the workflow does not use
+a reusable `NPM_TOKEN` secret. An npm maintainer must configure trusted publishing
+once for owner `evan-hyer`, repository `privacy-mask-video`, workflow `release.yml`,
+with direct and staged publication allowed. From an authenticated npm CLI 12:
+
+```powershell
+npm trust github privacy-mask-video --repo evan-hyer/privacy-mask-video --file release.yml --allow-publish --allow-stage-publish
+```
+
+The npm account login and 2FA check establish that trust. Expired local login
+sessions do not affect subsequent CI releases. If publishing reports E401,
+verify the trusted publisher's owner, repository and workflow filename rather
+than copying a local session token into GitHub. See
 [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
 
 ## Run locally

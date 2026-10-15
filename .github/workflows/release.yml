@@ -48,7 +48,6 @@ jobs:
       - name: Publish and verify registry integrity
         id: registry
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           RELEASE_MODE: ${{ inputs.mode || 'publish' }}
         run: node scripts/release-registry.mjs publish
       - name: Create experimental GitHub release
