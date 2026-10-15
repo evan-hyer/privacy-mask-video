@@ -28,8 +28,9 @@ SFace 2021dec - Apache-2.0
   OpenCV Zoo revision 47534e27c9851bb1128ccc0102f1145e27f23f98
   assets/licenses/face_recognition_sface.txt
 
-Noto Color Emoji font - Copyright Google Inc. - SIL Open Font License 1.1
-Noto Emoji source/sequence selection - Apache-2.0
+Noto Emoji PNG images and sequence selection - Copyright Google Inc. - Apache-2.0
+The upstream SIL Open Font License 1.1 notice is retained for provenance;
+no emoji font is used by this release.
   Revision e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e
   assets/licenses/noto-emoji.txt
   assets/licenses/noto-source.txt

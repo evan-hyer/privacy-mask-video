@@ -6,7 +6,7 @@ export interface SourceSummary { sourceId: string; displayWidth: number; display
 export interface FaceSummary { id: string; rect: Rect; landmarks: readonly Point[]; confidence: number }
 export type LossReason = 'no-candidate' | 'ambiguous' | 'occluded-or-out-of-frame' | 'weak-manual-match';
 export interface LossInterval { startUs: number; endUs: number; reasons: LossReason[] }
-export interface ExportResult { blob: Blob; filename: string; mimeType: string; width: number; height: number; durationUs: number; frameCount: number; audioTrackCount: number; lostIntervals: LossInterval[]; sourceId: string; settingsRevision: number }
+export interface ExportResult { blob: Blob; filename: string; mimeType: string; width: number; height: number; durationUs: number; frameCount: number; audioTrackCount: number; lostIntervals: LossInterval[]; targetCount: number; targetLosses: { selectionId: string; intervals: LossInterval[] }[]; sourceId: string; settingsRevision: number }
 export interface Progress { stage: 'processing' | 'finalizing'; processedFrames: number; timestampUs: number; durationUs: number; ratio: number | null }
 export type CancelReason = 'user' | 'replaced' | 'settings' | 'reset' | 'disconnected';
 export function snapshot<T>(value: T): T {

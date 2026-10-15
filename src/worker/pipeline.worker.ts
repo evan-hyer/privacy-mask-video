@@ -3,7 +3,8 @@ import { isMessage, incoming, closePayload } from './protocol';
 import type { Message, MessageType } from './protocol';
 import { initializeVision } from '../vision/runtime';
 import type { VisionRuntime } from '../vision/runtime';
-import { failure, sanitized, abortError } from '../core/errors';
+import type { FrameTrackingResult } from '../vision/types';
+import { failure, sanitized, diagnosed, abortError } from '../core/errors';
 import { validRect, validateRegion } from '../core/geometry';
 import { openVideo, initialFrame } from '../media/input';
 import type { OpenVideo } from '../media/input';
@@ -14,6 +15,7 @@ import { toUs, frameTime } from '../media/timeline';
 import { YuNet } from '../vision/yunet';
 import { SFace, imagePixels } from '../vision/sface';
 import { Association } from '../vision/association';
+import { resolveTrackingConflicts } from '../vision/multi-target';
 import { PROFILE, profileHash } from '../vision/profile';
 import { LossCollector } from '../vision/loss';
 import { drawMask } from '../render/mask';
@@ -45,23 +47,26 @@ async function load(request:Message<'LOAD'>):Promise<void> {
 }
 async function run(request:Message<'RUN'>):Promise<void> {
   if(!runtime) {request.payload.emojiBitmap.close();throw failure('invalid-state');}
-  const {source,selection,emojiBitmap,settingsRevision}=request.payload;
-  let media:OpenVideo|null=null,writer:ExportWriter|null=null,audio:AudioPump|null=null,association:Association|null=null;
+  const {source,selections,emojiBitmap,settingsRevision}=request.payload;
+  let media:OpenVideo|null=null,writer:ExportWriter|null=null,audio:AudioPump|null=null;
+  const associations:Association[]=[];
   try {
+    for(const selection of selections) {
     if(source.sourceId!==selection.sourceId||!validRect(selection.initialRect)||!Number.isFinite(selection.initialRotationRad)||!Number.isSafeInteger(settingsRevision)||!(emojiBitmap instanceof ImageBitmap)) throw failure('invalid-selection');
     if(selection.initialLandmarks && (selection.initialLandmarks.length!==5||!selection.initialLandmarks.every(point=>Number.isFinite(point.x)&&Number.isFinite(point.y)))) throw failure('invalid-selection');
+    }
+    if(selections.length>1 && (selections.some(selection=>selection.kind!=='detected') || new Set(selections.map(selection=>selection.candidateId)).size!==selections.length))throw failure('invalid-selection');
     media=await openVideo(source.file); check();
     if(media.width!==source.displayWidth||media.height!==source.displayHeight||media.originUs!==source.timelineOriginUs||media.durationUs!==source.durationUs||media.audio.length!==source.audioTrackCount||media.container!==source.container) throw failure('unsupported-input');
-    if(selection.kind==='manual') validateRegion(selection.initialRect,media.width,media.height);
-    else if(selection.kind!=='detected'||!selection.initialLandmarks) throw failure('invalid-selection');
+    for(const selection of selections) { if(selection.kind==='manual')validateRegion(selection.initialRect,media.width,media.height);else if(!selection.initialLandmarks)throw failure('invalid-selection'); }
     const route=await negotiate(media); check();
     if(JSON.stringify(route)!==JSON.stringify(source.outputRoute)) throw failure('unsupported-export');
     const canvas=new OffscreenCanvas(media.width,media.height),context=canvas.getContext('2d')!;
     writer=new ExportWriter(canvas,route); audio=new AudioPump(media.originUs,media.audio,route.audio,writer.output);
     await audio.initialize(media.audio); await writer.output.start(); await audio.prime(check); check();
     const detector=new YuNet(runtime.detector),recognizer=new SFace(runtime.recognition);
-    association=new Association(selection,recognizer,trackingProfileHash);
-    const losses=new LossCollector(); previews=new PreviewGate();
+    for(const selection of selections)associations.push(new Association(selection,recognizer,trackingProfileHash));
+    const losses=new LossCollector(),targetLosses=associations.map(()=>new LossCollector()); previews=new PreviewGate();
     let frameCount=0,previousTime=-1,endUs=0,lastProgress=-Infinity,lastTracking='';
     for await(const frame of media.sink.canvases()) {
       check();
@@ -69,10 +74,14 @@ async function run(request:Message<'RUN'>):Promise<void> {
       const timing=frameTime(frame.timestamp,frame.duration,media.originUs,previousTime);
       if(frameCount===0&&timing.timestampUs!==source.initialFrameTimeUs) throw failure('unsupported-input');
       const image=imagePixels(frame.canvas);
-      if(frameCount===0) await association.initialize(image);
+      if(frameCount===0) for(const association of associations)await association.initialize(image);
       const faces=await detector.detect(frame.canvas,source.sourceId); check();
-      const tracking=await association.track(image,faces,frameCount,timing.timestampUs,timing.durationUs); check();
-      context.drawImage(frame.canvas,0,0); drawMask(context,tracking.rect,tracking.rotationRad,{emojiBitmap,backingColor:PROFILE.backing,paddingRatio:PROFILE.coveragePadding});
+      const proposed:FrameTrackingResult[]=[];
+      for(const association of associations) {proposed.push(await association.track(image,faces,frameCount,timing.timestampUs,timing.durationUs,false));check();}
+      const trackings=resolveTrackingConflicts(proposed,associations);
+      context.drawImage(frame.canvas,0,0);
+      trackings.forEach((tracking,index)=>{associations[index]!.commit(tracking);targetLosses[index]!.append(tracking);drawMask(context,tracking.rect,tracking.rotationRad,{emojiBitmap,backingColor:PROFILE.backing,paddingRatio:PROFILE.coveragePadding});});
+      const tracking=trackings.find(tracking=>tracking.status==='lost') ?? trackings[0]!;
       losses.append(tracking);
       await writer.add(timing.timestampUs,timing.durationUs); check();
       endUs=timing.timestampUs+timing.durationUs;
@@ -95,9 +104,9 @@ async function run(request:Message<'RUN'>):Promise<void> {
     reply(request,'PROGRESS',{stage:'finalizing',processedFrames:frameCount,timestampUs:endUs,durationUs:source.durationUs,ratio:.99});
     await audio.advance(Infinity,check); await audio.close(); audio=null; check();
     const blob=await writer.finalize(); writer=null; check();
-    reply(request,'COMPLETE',{blob,filename:outputFilename(source.file.name,route.extension),mimeType:route.mimeType,width:source.displayWidth,height:source.displayHeight,durationUs:source.durationUs,frameCount,audioTrackCount:source.audioTrackCount,lostIntervals:losses.intervals,sourceId:source.sourceId,settingsRevision});
+    reply(request,'COMPLETE',{blob,filename:outputFilename(source.file.name,route.extension),mimeType:route.mimeType,width:source.displayWidth,height:source.displayHeight,durationUs:source.durationUs,frameCount,audioTrackCount:source.audioTrackCount,lostIntervals:losses.intervals,targetCount:selections.length,targetLosses:targetLosses.map((losses,index)=>({selectionId:selections[index]!.selectionId,intervals:losses.intervals})),sourceId:source.sourceId,settingsRevision});
   } finally {
-    emojiBitmap.close(); association?.dispose(); previews=null;
+    emojiBitmap.close(); for(const association of associations)association.dispose(); previews=null;
     try {await audio?.close();} finally {try {await writer?.abort();} finally {media?.input.dispose();}}
   }
 }
@@ -122,7 +131,7 @@ self.onmessage=(event:MessageEvent<unknown>):void=>{
       } else if(request.type==='LOAD') await load(request);
       else if(request.type==='RUN') await run(request);
     } catch(error) {
-      if(!canceled) {const safe=sanitized(error,request.type==='INIT'?'asset-load-failed':request.type==='LOAD'?'decode-failed':'encode-failed');reply(request,'ERROR',{code:safe.code,message:safe.message,recoverable:safe.recoverable});}
+      if(!canceled) {const safe=diagnosed(error,request.type==='INIT'?'asset-load-failed':request.type==='LOAD'?'decode-failed':'encode-failed',{stage:request.type==='INIT'?'runtime':request.type==='LOAD'?'decode':'encode',reason:'initialization'});reply(request,'ERROR',{code:safe.code,message:safe.message,recoverable:safe.recoverable,diagnostic:'diagnostic' in safe ? safe.diagnostic : undefined});}
     } finally {if(canceled)reply(request,'CANCELED',null);active=null;}
   })();
 };

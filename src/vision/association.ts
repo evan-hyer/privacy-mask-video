@@ -18,10 +18,10 @@ export class Association {
     if(this.selection.initialLandmarks) { this.anchor=await this.recognizer.describe(image,this.selection.initialLandmarks); this.referenceGeometry={rect:{...this.rect},landmarks:this.selection.initialLandmarks.map(point=>({...point}))}; }
     else this.manual=new RegionTracker(image,this.rect);
   }
-  async track(image:ImageData,faces:FaceCandidate[],frameIndex:number,timestampUs:number,durationUs:number):Promise<FrameTrackingResult> {
-    let rect:Rect|null=null,landmarks:Point[]|null=null,roll=this.roll;
+  async track(image:ImageData,faces:FaceCandidate[],frameIndex:number,timestampUs:number,durationUs:number,commit=true):Promise<FrameTrackingResult> {
+    let rect:Rect|null=null,landmarks:Point[]|null=null,roll=this.roll,candidateId:string|null=null;
     let reason:FrameTrackingResult['reason']='no-candidate';
-    if(frameIndex===0) { rect={...this.selection.initialRect}; landmarks=this.selection.initialLandmarks; }
+    if(frameIndex===0) { rect={...this.selection.initialRect}; landmarks=this.selection.initialLandmarks; candidateId=this.selection.candidateId; }
     else if(this.anchor) {
       const elapsed=Math.max(0,timestampUs-this.lastTime)/1e6;
       const expected=center(this.rect); const recent=this.history.at(-1),older=this.history.at(-2);
@@ -48,20 +48,25 @@ export class Association {
       // The runner-up includes spatially rejected faces, so position cannot hide ambiguity.
       scores.sort((a,b)=>b.score-a.score);
       const best=scores[0],runnerUp=scores[1]; const threshold=this.lost?PROFILE.reacquireSimilarity:PROFILE.similarity; const margin=this.lost?PROFILE.reacquireMargin:PROFILE.margin;
-      if(best && best.eligible && best.score>=threshold && (!runnerUp||best.score-runnerUp.score>=margin)) { rect=best.face.rect; landmarks=best.face.landmarks.map(point=>({...point})); roll=rotation(landmarks); }
+      if(best && best.eligible && best.score>=threshold && (!runnerUp||best.score-runnerUp.score>=margin)) { candidateId=best.face.id; rect=best.face.rect; landmarks=best.face.landmarks.map(point=>({...point})); roll=rotation(landmarks); }
       else reason=best&&best.score>=threshold?'ambiguous':faces.length?'occluded-or-out-of-frame':'no-candidate';
     } else if(this.manual && (!this.lost || timestampUs-this.lastTime<=PROFILE.manualReacquireUs)) {
       const match=this.manual.match(image,this.rect,this.roll,timestampUs-this.lastTime);
       if(match && (!this.lost || match.score>=PROFILE.manualReacquireScore)) {
         rect=match.rect; roll=match.rotationRad;
         const agreeing=faces.filter(face=>intersectionOverUnion(face.rect,match.rect)>.65);
-        if(agreeing.length===1) { const face=agreeing[0]!; this.anchor=await this.recognizer.describe(image,face.landmarks); this.referenceGeometry={rect:{...face.rect},landmarks:face.landmarks.map(point=>({...point}))}; rect=face.rect; landmarks=face.landmarks.map(point=>({...point})); roll=rotation(landmarks); }
+        if(agreeing.length===1) { const face=agreeing[0]!; candidateId=face.id; this.anchor=await this.recognizer.describe(image,face.landmarks); this.referenceGeometry={rect:{...face.rect},landmarks:face.landmarks.map(point=>({...point}))}; rect=face.rect; landmarks=face.landmarks.map(point=>({...point})); roll=rotation(landmarks); }
       } else reason='weak-manual-match';
     } else reason='weak-manual-match';
     const acquired=rect!==null;
-    if(acquired) { this.rect={...rect!}; this.roll=roll; this.lastTime=timestampUs; this.history.push({rect:{...this.rect},time:timestampUs}); if(this.history.length>2) this.history.shift(); }
-    this.lost=!acquired;
-    return {frameIndex,timestampUs,durationUs,status:acquired?'acquired':'lost',reason:acquired?null:reason,rect:{...this.rect},rotationRad:this.roll,landmarks:acquired?landmarks:null,geometrySource:acquired?'measured':'held',selectionId:this.selection.selectionId,profileHash:this.hash};
+    const tracking:FrameTrackingResult={frameIndex,timestampUs,durationUs,status:acquired?'acquired':'lost',reason:acquired?null:reason,rect:acquired?{...rect!}:{...this.rect},rotationRad:acquired?roll:this.roll,landmarks:acquired?landmarks:null,geometrySource:acquired?'measured':'held',selectionId:this.selection.selectionId,profileHash:this.hash,candidateId};
+    if(commit)this.commit(tracking);
+    return tracking;
+  }
+  hold(tracking:FrameTrackingResult):FrameTrackingResult { return {...tracking,status:'lost',reason:'ambiguous',rect:{...this.rect},rotationRad:this.roll,landmarks:null,geometrySource:'held',candidateId:null}; }
+  commit(tracking:FrameTrackingResult):void {
+    if(tracking.status==='acquired') { this.rect={...tracking.rect};this.roll=tracking.rotationRad;this.lastTime=tracking.timestampUs;this.history.push({rect:{...this.rect},time:tracking.timestampUs});if(this.history.length>2)this.history.shift(); }
+    this.lost=tracking.status==='lost';
   }
   dispose():void { this.anchor=null; this.referenceGeometry=null; this.manual=null; this.history=[]; }
 }

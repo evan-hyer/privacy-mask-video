@@ -1,6 +1,7 @@
 import { failure } from './errors';
 export const EMOJIS = Object.freeze(['😎','😀','😂','🤣','😃','😄','😁','😅','😆','😇','😈','😉','😊','😋','😍','🤐','🤖','👽','👻','🐱','🐶','🧑‍💻']);
 export const DEFAULT_EMOJI = '😎';
+export const emojiResource = (emoji: string): string => 'emoji/' + Array.from(emoji, character => character.codePointAt(0)!.toString(16)).join('_') + '.png';
 export interface ComponentConfiguration { emoji: string; disabled: boolean; assetBase: string }
 export function validateEmoji(value: unknown): string {
   if (typeof value !== 'string' || !EMOJIS.includes(value)) throw failure('invalid-emoji');

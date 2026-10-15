@@ -38,6 +38,8 @@ jobs:
       - run: npm install --global npm@12.2.0 --ignore-scripts --no-audit --no-fund
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run assets:prepare
+      - name: Run targeted regression tests
+        run: npm test
       - name: Build and inspect package
         run: |
           npm run prepack

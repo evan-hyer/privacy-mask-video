@@ -5,7 +5,9 @@ export class ProcessingSession {
   generation = 0;
   source: SourceSummary | null = null;
   faces: FaceCandidate[] = [];
-  selection: TargetSelection | null = null;
+  selections: TargetSelection[] = [];
+  get selection(): TargetSelection | null { return this.selections[0] ?? null; }
+  set selection(value: TargetSelection | null) { this.selections = value ? [value] : []; }
   result: ExportResult | null = null;
   settingsRevision = 0;
   invalidate(): void { this.generation++; this.result = null; }

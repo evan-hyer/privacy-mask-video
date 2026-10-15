@@ -49,7 +49,7 @@ for (const [filename, kind] of [['ort-wasm-simd-threaded.mjs', 'runtime-module']
 }
 const fontNotice = 'licenses/noto-emoji.txt';
 await remote({ path: fontNotice, kind: 'license', url: raw('googlefonts/noto-emoji', noto, '2D/fonts/LICENSE'), revision: noto, license: 'OFL-1.1', notice: fontNotice });
-await remote({ path: 'emoji/NotoColorEmoji.ttf', kind: 'font', url: raw('googlefonts/noto-emoji', noto, '2D/fonts/NotoColorEmoji.ttf'), revision: noto, license: 'OFL-1.1', notice: fontNotice });
+// Use PNG images across browsers; the CBDT/CBLC font cannot load in Apple renderers.
 // v1 deliberately supports this finite reviewed set, including joined sequences.
 // The source SVG for each sequence establishes its presence in this font revision.
 const candidates = ['1f60e', '1f600', '1f602', '1f923', '1f603', '1f604', '1f601', '1f605', '1f606', '1f607', '1f608', '1f609', '1f60a', '1f60b', '1f60d', '1f910', '1f916', '1f47d', '1f47b', '1f431', '1f436', '1f9d1_200d_1f4bb'];
@@ -57,6 +57,7 @@ const sequences = [];
 for (const hex of candidates) {
   await request(raw('googlefonts/noto-emoji', noto, `2D/svg/emoji_u${hex}.svg`));
   sequences.push(String.fromCodePoint(...hex.split('_').map(part => parseInt(part, 16))));
+  await remote({path:'emoji/'+hex+'.png',kind:'emoji-image',url:raw('googlefonts/noto-emoji',noto,'2D/png/128/emoji_u'+hex+'.png'),revision:noto,license:'Apache-2.0',notice:'licenses/noto-source.txt'});
 }
 await add({ path: 'emoji/sequences.json', kind: 'emoji-sequences', revision: noto, license: 'Apache-2.0', notice: 'licenses/noto-source.txt' }, Buffer.from(`${JSON.stringify({ schemaVersion: 1, fontRevision: noto, default: '😎', sequences }, null, 2)}\n`));
 await remote({ path: 'licenses/noto-source.txt', kind: 'license', url: raw('googlefonts/noto-emoji', noto, 'LICENSE'), revision: noto, license: 'Apache-2.0', notice: 'licenses/noto-source.txt' });
