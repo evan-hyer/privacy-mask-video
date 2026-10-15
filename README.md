@@ -138,16 +138,16 @@ throws NotSupportedError. index.d.ts and supporting declarations ship in dist/.
 Pre-upgrade property values win over conflicting initial attributes. No network
 or processing starts in the constructor. Read-only state, capabilities, source,
 faces and result properties return defensive frozen snapshots. source contains
-metadata, not the File; faces contains initial candidate boundaries/landmarks,
-not appearance descriptors. result is null until finalization succeeds.
+metadata, not the File; faces contains reference boundaries/landmarks and firstSeenUs
+from the full-video catalog, not appearance descriptors. result is null until finalization succeeds.
 
 | Method | Behavior |
 | --- | --- |
 | initialize() | Initialize or retry local resources while connected; Promise of capability report. |
-| load(file) | Accept a positive-sized local File; await initialization, preflight export, show the first decoded frame and detectable candidates. Invalid arguments retain valid prior media; an accepted replacement cancels old work and clears old results. |
-| selectFace(id) | Select one current initial-frame candidate, replacing the selection. Processing never starts automatically. |
+| load(file) | Accept a positive-sized local File; await initialization, preflight export, scan every decoded frame and show the first frame plus a timestamped face gallery. Invalid arguments retain valid prior media; an accepted replacement cancels old work and clears old results. |
+| selectFace(id) | Select one current catalog candidate, replacing the selection. Processing never starts automatically. |
 | selectFaces(ids) | Replace the selection with up to eight distinct current candidate IDs; an empty array clears it. |
-| selectRegion(rect) | Select a finite, positive rectangle entirely within the display-oriented source dimensions. |
+| selectRegion(rect) | Select a finite, positive rectangle in the opening frame, entirely within the display-oriented source dimensions. |
 | process() | Process from the beginning with fresh identity state; Promise of a finalized ExportResult. Concurrent process calls reject. |
 | cancel() | Abort active work and reject its promise with AbortError; retain source/selection after processing cancellation. A worker that has not acknowledged within 250 ms is terminated. |
 | reset() | Clear media/results; retain configuration and reusable resident assets. |
