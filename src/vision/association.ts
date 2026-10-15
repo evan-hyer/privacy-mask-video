@@ -15,13 +15,14 @@ export class Association {
   private referenceGeometry:{rect:Rect;landmarks:readonly Point[]}|null=null;
   constructor(private selection:TargetSelection,private recognizer:SFace,private hash:string) { this.rect={...selection.initialRect}; this.roll=selection.initialRotationRad; }
   async initialize(image:ImageData):Promise<void> {
-    if(this.selection.initialLandmarks) { this.anchor=await this.recognizer.describe(image,this.selection.initialLandmarks); this.referenceGeometry={rect:{...this.rect},landmarks:this.selection.initialLandmarks.map(point=>({...point}))}; }
+    this.lastTime=this.selection.firstSeenUs ?? 0;
+    if(this.selection.initialLandmarks) { this.anchor=this.selection.embedding?.slice() ?? await this.recognizer.describe(image,this.selection.initialLandmarks); this.referenceGeometry={rect:{...this.rect},landmarks:this.selection.initialLandmarks.map(point=>({...point}))}; }
     else this.manual=new RegionTracker(image,this.rect);
   }
   async track(image:ImageData,faces:FaceCandidate[],frameIndex:number,timestampUs:number,durationUs:number,commit=true):Promise<FrameTrackingResult> {
     let rect:Rect|null=null,landmarks:Point[]|null=null,roll=this.roll,candidateId:string|null=null;
     let reason:FrameTrackingResult['reason']='no-candidate';
-    if(frameIndex===0) { rect={...this.selection.initialRect}; landmarks=this.selection.initialLandmarks; candidateId=this.selection.candidateId; }
+    if(timestampUs===(this.selection.firstSeenUs ?? 0) || frameIndex===0 && this.selection.firstSeenUs===undefined) { rect={...this.selection.initialRect}; landmarks=this.selection.initialLandmarks; candidateId=faces.find(face=>intersectionOverUnion(face.rect,this.selection.initialRect)>.9)?.id ?? this.selection.candidateId; }
     else if(this.anchor) {
       const elapsed=Math.max(0,timestampUs-this.lastTime)/1e6;
       const expected=center(this.rect); const recent=this.history.at(-1),older=this.history.at(-2);

@@ -1,6 +1,7 @@
 import { template } from './template';
 import { emojiBitmap } from './emoji';
 import { sourcePoint, drawnRegion } from './selection';
+import { faceColor } from './face-colors';
 import { drawMask } from '../render/mask';
 import { ProcessingSession } from '../core/session';
 import { ResidentAssets } from '../core/assets';
@@ -46,6 +47,8 @@ export class PrivacyMaskVideoElement extends HTMLElement {
   private upgraded = false;
   private preupgrade = new Map<string, unknown>();
   private drawStart: Point | null = null;
+  private drawing = false;
+  private faceURLs: string[] = [];
   private lastAnnouncement = 0;
   private lastLiveAnnouncement = -Infinity;
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -86,7 +89,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
   }
   get capabilities(): CapabilityReport | null { return this.capability ? snapshot(this.capability) : null; }
   get source(): SourceSummary | null { return this.session.source ? snapshot(this.session.source) : null; }
-  get faces(): readonly FaceSummary[] { return snapshot(this.session.faces.map(({id,rect,landmarks,confidence}) => ({id,rect,landmarks,confidence}))); }
+  get faces(): readonly FaceSummary[] { return snapshot(this.session.faces.map(({id,rect,landmarks,confidence,firstSeenUs}) => ({id,rect,landmarks,confidence,...(firstSeenUs===undefined?{}:{firstSeenUs})}))); }
   get selectedFaceIds(): readonly string[] { return snapshot(this.session.selections.flatMap(selection => selection.candidateId ? [selection.candidateId] : [])); }
   get result(): ExportResult | null { return this.session.result ? snapshot(this.session.result) : null; }
   attributeChangedCallback(name: string, oldValue: string | null, value: string | null): void {
@@ -153,7 +156,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     const operation = this.begin('load');
     try {
       await abortable(this.initialize(),operation.controller.signal); this.assertOperation(operation);
-      this.setState('loading'); this.status('Reading video and detecting faces…');
+      this.setState('loading'); this.ui<HTMLProgressElement>('progress').value=0; this.status('Scanning the entire video for faces. Longer videos take more time on this device…');
       const response = await this.client!.request('LOAD',{file,sourceId:crypto.randomUUID()},'LOADED');
       if (response.type !== 'LOADED') throw failure('worker-failed');
       if (this.operation !== operation || !this.isConnected) { response.payload.bitmap.close(); throw abortError(); }
@@ -162,7 +165,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
       this.session.source = {sourceId,displayWidth,displayHeight,durationUs,container,audioTrackCount}; this.session.faces = this.loaded.initialCandidates;
       await this.refreshEmoji(); this.assertOperation(operation);
       this.operation = null; this.setState('selecting');
-      this.status(this.session.faces.length ? 'Choose the faces to mask (up to 8). Tap each face below or its boundary.' : 'No faces detected. Draw a rectangle, use the numeric fields, or choose another video.');
+      this.status(this.session.faces.length ? 'Full-video scan complete. Choose up to 8 faces below. Colors and numbers match the preview; thumbnails show later appearances.' : 'No faces detected in the video. Open manual selection or choose another video.');
       this.renderFaces(); this.drawInitial();
       this.emit('loaded',{sourceId,width:displayWidth,height:displayHeight,durationUs,faceCount:this.session.faces.length,audioTrackCount});
       return snapshot(this.session.source);
@@ -179,7 +182,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
       });
     });
     this.cancelOperation('settings'); this.invalidateResult();
-    this.session.selections = candidates.map(candidate => ({ selectionId:crypto.randomUUID(), sourceId:this.loaded!.sourceId,kind:'detected',candidateId:candidate.id,initialRect:{...candidate.rect},initialLandmarks:candidate.landmarks.map(point=>({...point})),initialRotationRad:rotation(candidate.landmarks) }));
+    this.session.selections = candidates.map(candidate => ({ selectionId:crypto.randomUUID(), sourceId:this.loaded!.sourceId,kind:'detected',candidateId:candidate.id,initialRect:{...candidate.rect},initialLandmarks:candidate.landmarks.map(point=>({...point})),initialRotationRad:rotation(candidate.landmarks),...(candidate.firstSeenUs===undefined?{}:{firstSeenUs:candidate.firstSeenUs}),...(candidate.embedding?{embedding:candidate.embedding.slice()}:{}) }));
     this.setState(candidates.length ? 'selected' : 'selecting');
     this.status(candidates.length ? candidates.length + ' face(s) selected. Tap a face to add or remove it, then process the video.' : 'Choose the faces you want to mask.');
     this.renderFaces(); this.drawInitial();
@@ -195,7 +198,7 @@ export class PrivacyMaskVideoElement extends HTMLElement {
       this.requireEnabled(); if (!this.loaded || this.operation?.kind === 'load') throw failure('invalid-state');
       return validateRegion(rect,this.loaded.displayWidth,this.loaded.displayHeight);
     });
-    this.select(region,null,null);
+    this.stopDrawing(); this.select(region,null,null);
   }
   private select(rect: Rect, candidateId: string | null, landmarks: Point[] | null): void {
     if (!this.loaded) throw failure('invalid-state');
@@ -209,9 +212,10 @@ export class PrivacyMaskVideoElement extends HTMLElement {
       this.requireEnabled(); if (!this.loaded || !this.session.selection || this.operation || this.initialization) throw failure('invalid-state');
       return { source:this.loaded, selections:structuredClone(this.session.selections) };
     });
-    this.invalidateResult();
+    this.stopDrawing(); this.invalidateResult();
     const operation = this.begin('process'); const { source,selections } = context; const emoji = this._emoji; const settingsRevision = this.session.settingsRevision;
     this.ui<HTMLProgressElement>('progress').value=0;
+    this.ui('progress').setAttribute('aria-label','Video processing progress');
     this.setState('processing'); this.status('Processing video locally…');
     try {
       await abortable(this.initialize(),operation.controller.signal); this.assertOperation(operation); this.setState('processing');
@@ -259,10 +263,15 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     this.ui('review-section').hidden = true;
   }
   private clearMedia(): void {
+    for(const url of this.faceURLs)URL.revokeObjectURL(url); this.faceURLs=[];
+    this.stopDrawing();
     this.invalidateResult(); this.firstFrame?.close(); this.firstFrame = null; this.loaded = null;
     this.session.clear(); this.ui('faces').replaceChildren();
     const canvas = this.ui<HTMLCanvasElement>('preview'); canvas.getContext('2d')?.clearRect(0,0,canvas.width,canvas.height);
     this.previewEmoji?.close(); this.previewEmoji = null; this.updateControls();
+  }
+  private stopDrawing(): void {
+    this.drawing=false;this.drawStart=null;this.ui('preview').classList.remove('drawing');this.ui('draw').setAttribute('aria-pressed','false');
   }
   private emit(name: string, detail: unknown): void { this.dispatchEvent(new CustomEvent(`pmv-${name}`,{detail:snapshot(detail),bubbles:true,composed:true})); }
   private setState(state: ComponentState): void {
@@ -287,12 +296,13 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     this.ui<HTMLInputElement>('file').disabled = blocked;
     this.ui<HTMLButtonElement>('process').disabled = blocked || !this.session.selection || !!this.operation || !!this.initialization;
     this.ui<HTMLButtonElement>('region').disabled = blocked || !this.loaded;
+    this.ui<HTMLButtonElement>('draw').disabled = blocked || !this.loaded || !!this.operation;
     this.ui<HTMLFieldSetElement>('manual').disabled = blocked || !this.loaded;
     for (const id of ['emoji','custom','apply']) (this.ui(id) as HTMLInputElement).disabled = blocked;
     this.ui<HTMLButtonElement>('cancel').disabled = !this.operation;
     this.ui<HTMLButtonElement>('download').disabled = blocked || !this.session.result;
     this.ui('initialize').hidden = this.state !== 'error' || !!this.capability;
-    this.ui('progress').hidden = this.operation?.kind !== 'process' && this.state !== 'complete';
+    this.ui('progress').hidden = !this.operation && this.state !== 'complete';
     this.shadowRoot.querySelectorAll<HTMLButtonElement>('#faces button').forEach(button => { button.disabled = blocked || this.operation?.kind === 'load'; });
   }
   private async refreshEmoji(): Promise<void> {
@@ -305,25 +315,44 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     } catch(error) { if (this.assets === assets && this.isConnected) this.report(error,false); }
   }
   private renderFaces(): void {
+    const focusedFace=this.shadowRoot!.activeElement?.getAttribute('data-face-id');
+    for(const url of this.faceURLs)URL.revokeObjectURL(url); this.faceURLs=[];
     const container = this.ui('faces'); container.replaceChildren();
     this.session.faces.forEach((candidate,index) => {
-      const button = document.createElement('button'); button.type = 'button'; button.textContent = `Face ${index+1}`; button.disabled = this.disabled;
-      button.setAttribute('aria-pressed',String(this.session.selections.some(selection=>selection.candidateId === candidate.id)));
+      const color=faceColor(index),selected=this.session.selections.some(selection=>selection.candidateId===candidate.id);
+      const button = document.createElement('button'); button.type = 'button'; button.disabled = this.disabled;
+      button.setAttribute('aria-label',`Face ${index+1}`);button.title=`Face ${index+1} · ${color.name} · first seen at ${((candidate.firstSeenUs??0)/1e6).toFixed(2)} s`;
+      button.setAttribute('data-face-id',candidate.id);button.setAttribute('aria-description',`${color.name}; first seen at ${((candidate.firstSeenUs??0)/1e6).toFixed(2)} seconds`);
+      button.style.setProperty('--face-color',color.value);
+      if(candidate.thumbnail) {const image=document.createElement('img');const url=URL.createObjectURL(candidate.thumbnail);this.faceURLs.push(url);image.src=url;image.alt='';image.width=48;image.height=48;button.append(image);}
+      const label=document.createElement('span');label.textContent=`${selected?'✓ ':''}Face ${index+1}`;
+      const detail=document.createElement('small');detail.textContent=`${color.name} · ${((candidate.firstSeenUs??0)/1e6).toFixed(2)} s`;label.append(detail);button.append(label);
+      button.setAttribute('aria-pressed',String(selected));
       button.addEventListener('click',() => this.userAction(() => this.toggleFace(candidate.id))); container.append(button);
+      if(focusedFace===candidate.id)button.focus({preventScroll:true});
     });
   }
   private drawInitial(draft?: Rect): void {
     if (!this.firstFrame || !this.loaded || this.operation?.kind === 'process') return;
     const canvas = this.ui<HTMLCanvasElement>('preview'); canvas.width = this.loaded.displayWidth; canvas.height = this.loaded.displayHeight;
     const context = canvas.getContext('2d')!; context.drawImage(this.firstFrame,0,0);
-    for (const face of this.session.faces) { context.strokeStyle = this.session.selections.some(selection=>selection.candidateId === face.id) ? '#48ed95' : '#ffd54f'; context.lineWidth = Math.max(2,canvas.width/300); context.strokeRect(face.rect.x,face.rect.y,face.rect.width,face.rect.height); }
-    if (this.previewEmoji) for (const selection of this.session.selections) drawMask(context,selection.initialRect,selection.initialRotationRad,{emojiBitmap:this.previewEmoji,backingColor:'#ffd54f',paddingRatio:.12});
+    if (this.previewEmoji) for (const selection of this.session.selections) {
+      if((selection.firstSeenUs??this.loaded.initialFrameTimeUs)>this.loaded.initialFrameTimeUs)continue;
+      drawMask(context,selection.initialRect,selection.initialRotationRad,{emojiBitmap:this.previewEmoji,backingColor:faceColor(Math.max(0,this.session.faces.findIndex(face=>face.id===selection.candidateId))).value,paddingRatio:.12});
+    }
+    this.session.faces.forEach((face,index)=>{
+      if((face.firstSeenUs??this.loaded!.initialFrameTimeUs)>this.loaded!.initialFrameTimeUs)return;
+      const color=faceColor(index);context.strokeStyle=color.value;context.lineWidth=Math.max(3,canvas.width/240);context.strokeRect(face.rect.x,face.rect.y,face.rect.width,face.rect.height);
+      const size=Math.max(18,canvas.width/36),text=`Face ${index+1}`;context.font=`bold ${size}px system-ui`;
+      const width=context.measureText(text).width+12,x=Math.max(0,Math.min(face.rect.x,canvas.width-width)),y=Math.max(size+8,face.rect.y);
+      context.fillStyle=color.value;context.fillRect(x,y-size-8,width,size+8);context.fillStyle='#14212c';context.fillText(text,x+6,y-5);
+    });
     if (draft) { context.strokeStyle='#48ed95'; context.lineWidth=3; context.strokeRect(draft.x,draft.y,draft.width,draft.height); }
   }
   private renderLosses(): void {
     const result = this.session.result!; this.ui('review-section').hidden = false; this.ui('losses').replaceChildren();
     this.ui('loss-summary').textContent = result.lostIntervals.length ? 'Tracking was lost during these intervals. A held mask may not cover the intended face.' : 'No tracking loss was reported. Coverage still requires review.';
-    const losses = result.targetLosses.flatMap((target,index)=>target.intervals.map(interval=>({interval,label:'Target '+(index+1)})));
+    const losses = result.targetLosses.flatMap(target=>{const selection=this.session.selections.find(selection=>selection.selectionId===target.selectionId),index=this.session.faces.findIndex(face=>face.id===selection?.candidateId);return target.intervals.map(interval=>({interval,label:index>=0?'Face '+(index+1):'Manual target'}));});
     for (const {interval,label} of losses) {
       const item = document.createElement('li'); const button = document.createElement('button'); button.type='button';
       button.textContent=`${label}: ${(interval.startUs/1e6).toFixed(2)}–${(interval.endUs/1e6).toFixed(2)} s: ${interval.reasons.map(reason=>LOSS_LABELS[reason]).join(', ')}`;
@@ -331,6 +360,11 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     }
   }
   private workerMessage(message: Message): void {
+    if(this.operation?.kind==='load' && message.type==='PROGRESS' && message.payload.stage==='scanning') {
+      this.ui('progress').setAttribute('aria-label','Full-video face discovery progress');
+      const progress=this.ui<HTMLProgressElement>('progress');if(message.payload.ratio===null)progress.removeAttribute('value');else progress.value=message.payload.ratio;
+      this.status(`Scanning the entire video for faces… ${Math.round((message.payload.ratio??0)*100)}%`);this.emit('progress',{jobId:this.operation.jobId,...message.payload});return;
+    }
     if (this.operation?.kind !== 'process') { if (message.type === 'PREVIEW') message.payload.bitmap.close(); return; }
     const jobId = this.operation.jobId;
     if (message.type === 'PREVIEW') {
@@ -365,18 +399,21 @@ export class PrivacyMaskVideoElement extends HTMLElement {
     this.ui('emoji').addEventListener('change',() => this.userAction(() => { this.emoji=this.ui<HTMLSelectElement>('emoji').value; }));
     this.ui('apply').addEventListener('click',() => this.userAction(() => { this.emoji=this.ui<HTMLInputElement>('custom').value; }));
     this.ui('region').addEventListener('click',() => this.userAction(() => this.selectRegion({x:Number(this.ui<HTMLInputElement>('x').value),y:Number(this.ui<HTMLInputElement>('y').value),width:Number(this.ui<HTMLInputElement>('width').value),height:Number(this.ui<HTMLInputElement>('height').value)})));
+    this.ui('draw').addEventListener('click',()=>{this.drawing=!this.drawing;this.ui('draw').setAttribute('aria-pressed',String(this.drawing));this.ui('preview').classList.toggle('drawing',this.drawing);});
+    this.ui<HTMLDetailsElement>('manual-details').addEventListener('toggle',()=>{if(!this.ui<HTMLDetailsElement>('manual-details').open)this.stopDrawing();});
     const canvas = this.ui<HTMLCanvasElement>('preview');
-    canvas.addEventListener('pointerdown',event => { if (!this.loaded || this.disabled) return; this.drawStart=sourcePoint(canvas,event); if (this.drawStart) canvas.setPointerCapture(event.pointerId); });
-    canvas.addEventListener('pointermove',event => { const point=sourcePoint(canvas,event); if (point && this.drawStart) this.drawInitial(drawnRegion(this.drawStart,point)); });
+    canvas.addEventListener('pointerdown',event => { if (!this.loaded || this.disabled || this.operation) return; this.drawStart=sourcePoint(canvas,event); if (this.drawStart && this.drawing) canvas.setPointerCapture(event.pointerId); });
+    canvas.addEventListener('pointermove',event => { const point=sourcePoint(canvas,event); if (point && this.drawStart && this.drawing) this.drawInitial(drawnRegion(this.drawStart,point)); });
     canvas.addEventListener('pointerup',event => {
       const end=sourcePoint(canvas,event); const start=this.drawStart; this.drawStart=null;
       if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
       if (!start || !end || this.disabled) return;
       const rect=drawnRegion(start,end);
-      if (rect.width < 3 && rect.height < 3) {
-        const face=this.session.faces.find(face => end.x >= face.rect.x && end.y >= face.rect.y && end.x <= face.rect.x+face.rect.width && end.y <= face.rect.y+face.rect.height);
+      const scale=Math.min(canvas.clientWidth/canvas.width,canvas.clientHeight/canvas.height),tapSlop=6/scale;
+      if (rect.width < tapSlop && rect.height < tapSlop) {
+        const face=this.session.faces.find(face => (face.firstSeenUs??this.loaded!.initialFrameTimeUs)<=this.loaded!.initialFrameTimeUs && end.x >= face.rect.x && end.y >= face.rect.y && end.x <= face.rect.x+face.rect.width && end.y <= face.rect.y+face.rect.height);
         if (face) this.userAction(() => this.toggleFace(face.id)); else this.drawInitial();
-      } else this.userAction(() => this.selectRegion(rect));
+      } else if(this.drawing)this.userAction(() => this.selectRegion(rect));
     });
     canvas.addEventListener('pointercancel',() => { this.drawStart=null; this.drawInitial(); });
   }

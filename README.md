@@ -11,7 +11,22 @@ browser compatibility, offline behavior, or performance. Review all output.
 
 ## npm package
 
-The release name is `privacy-mask-video`, version 0.1.2 (experimental).
+The release name is `privacy-mask-video`, version 0.1.3 (experimental).
+
+Loading scans every decoded frame for faces, including brief and later appearances.
+The face gallery includes a thumbnail and first-seen time; choose up to eight targets
+from the complete catalog. Face numbers and colors stay stable when selections change
+(Face 1 is green), including mask backing colors and tracking-loss labels. A selected
+later face starts masking at its first detected appearance, without drawing a mask
+over the opening frames. Identity matching can still split one person into several
+entries or miss a face; review the full result. Scanning and export each decode the
+video, so long clips take additional time, especially on phones. Scan progress and
+cancellation are available. Face references remain on the device and are cleared
+when the video is reset, replaced, or the element disconnects.
+
+The mobile editor uses native file, emoji, numeric and video controls. Open Manual
+selection and enable drawing to drag a rectangle; otherwise the preview permits
+vertical scrolling and pinch zoom. Manual selection applies to the opening frame.
 
 ```powershell
 npm install privacy-mask-video
