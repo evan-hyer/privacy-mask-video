@@ -4,6 +4,8 @@ A native `<privacy-mask-video>` Web Component for choosing up to eight faces in 
 MOV/MP4/WebM video, covering it with an emoji, reviewing tracking losses, and
 downloading the result. No UI framework or consumer bundler is required.
 
+**Want to experiment? [Try the live demo](https://d28lux7c66widn.cloudfront.net/privacy-mask-video).**
+
 Implementation is available. **Runtime testing and qualification are deferred
 at the user's request.** Tracking thresholds are provisional and uncalibrated.
 Compilation/build success does not establish tracking accuracy, output coverage,
@@ -18,8 +20,10 @@ The face gallery includes a thumbnail and first-seen time; choose up to eight ta
 from the complete catalog. Face numbers and colors stay stable when selections change
 (Face 1 is green), including mask backing colors and tracking-loss labels. A selected
 later face starts masking at its first detected appearance, without drawing a mask
-over the opening frames. Identity matching can still split one person into several
-entries or miss a face; review the full result. Scanning and export each decode the
+over the opening frames. The catalog remembers several appearances of each person
+to reduce duplicate entries after head turns, lighting changes, or a later return.
+People detected together keep separate entries. Identity matching can still split
+one person into several entries or miss a face; review the full result. Scanning and export each decode the
 video, so long clips take additional time, especially on phones. Scan progress and
 cancellation are available. Face references remain on the device and are cleared
 when the video is reset, replaced, or the element disconnects.
