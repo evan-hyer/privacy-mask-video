@@ -1,81 +1,336 @@
 # Privacy Mask Video
 
-A native `<privacy-mask-video>` Web Component for choosing up to eight faces in a local
-MOV/MP4/WebM video, covering it with an emoji, reviewing tracking losses, and
-downloading the result. No UI framework or consumer bundler is required.
+A native `<privacy-mask-video>` Web Component that covers selected faces in local
+MOV, MP4, and WebM videos with emoji. Scan a video, choose up to eight faces,
+process it on your device, and review the result before downloading.
+No UI framework or consumer bundler is required.
 
 **Want to experiment? [Try the live demo](https://d28lux7c66widn.cloudfront.net/privacy-mask-video).**
 
-Implementation is available. **Runtime testing and qualification are deferred
-at the user's request.** Tracking thresholds are provisional and uncalibrated.
-Compilation/build success does not establish tracking accuracy, output coverage,
-browser compatibility, offline behavior, or performance. Review all output.
+[npm package](https://www.npmjs.com/package/privacy-mask-video) ·
+[Report an issue](https://github.com/evan-hyer/privacy-mask-video/issues)
 
-## npm package
+**Experimental:** face matching can miss faces or create duplicate entries.
+Review the full output before sharing. Audio is preserved and is not anonymized.
 
-The release name is `privacy-mask-video`, version 0.1.3 (experimental).
+## Contents
 
-Loading scans every decoded frame for faces, including brief and later appearances.
-The face gallery includes a thumbnail and first-seen time; choose up to eight targets
-from the complete catalog. Face numbers and colors stay stable when selections change
-(Face 1 is green), including mask backing colors and tracking-loss labels. A selected
-later face starts masking at its first detected appearance, without drawing a mask
-over the opening frames. The catalog remembers several appearances of each person
-to reduce duplicate entries after head turns, lighting changes, or a later return.
-People detected together keep separate entries. Identity matching can still split
-one person into several entries or miss a face; review the full result. Scanning and export each decode the
-video, so long clips take additional time, especially on phones. Scan progress and
-cancellation are available. Face references remain on the device and are cleared
-when the video is reset, replaced, or the element disconnects.
+- [Features](#features)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Using the editor](#using-the-editor)
+- [JavaScript API](#javascript-api)
+- [Events](#events)
+- [Styling](#styling)
+- [How it works](#how-it-works)
+- [Supported media and limits](#supported-media-and-limits)
+- [Browser and hosting requirements](#browser-and-hosting-requirements)
+- [Privacy](#privacy)
+- [Local development](#local-development)
+- [Validation status](#validation-status)
+- [Releases](#releases)
+- [License](#license)
 
-The mobile editor uses native file, emoji, numeric and video controls. Open Manual
-selection and enable drawing to drag a rectangle; otherwise the preview permits
-vertical scrolling and pinch zoom. Manual selection applies to the opening frame.
+## Features
 
-```powershell
+- Scan every decoded frame for faces, including brief and later appearances.
+- Choose up to eight faces from a gallery with thumbnails and first-seen times.
+- Keep face numbers and colors stable as selections change; Face 1 is green.
+- Remember multiple appearances during discovery to reduce duplicate entries
+  after head turns, lighting changes, and later returns.
+- Use one of 22 bundled emoji images with an opaque mask backing.
+- Select a manual rectangle for an undetected face in the opening frame.
+- Follow scan/export progress, cancel processing, and review tracking-loss intervals.
+- Export MP4 or WebM while preserving every audio track through a supported route.
+- Embed independent component instances in an ordinary HTML page.
+
+These features describe the current repository. Its package version is **0.1.3**;
+the npm `latest` tag was **0.1.2** when checked on October 17, 2026. Installing
+from npm or visiting the demo may provide a different revision. Source changes
+reach those destinations after a package release or site deployment.
+
+## Installation
+
+Install the published package:
+
+```sh
 npm install privacy-mask-video
 ```
 
-Copy node_modules/privacy-mask-video/dist/ in its entirety to a directory served
-on your origin, then use the ordinary HTML embedding example below. The package
-includes the worker, WASM, models, emoji PNGs, sequence manifest and third-party
-notices; installed consumers do not need to download resources from upstream.
-Asset and worker subpaths are exported for host tooling. Importing the component
-does not automatically copy static assets for a consuming bundler.
+Copy the **complete** `node_modules/privacy-mask-video/dist/` directory to a
+same-origin location such as `/components/privacy-mask-video/`. Preserve its
+JavaScript chunks, workers, assets, and notices. The package includes the models,
+WASM runtime, emoji images, and TypeScript declarations; installed consumers do
+not need to fetch upstream model resources.
 
-Maintainers can run the **Release** workflow from GitHub Actions or push a
-`v<package.json version>` tag. It restores pinned assets, compiles/builds and
-inspects the archive, publishes to npm with provenance, verifies registry
-integrity, and creates an experimental GitHub release with the archive and
-checksum. The final job runs dependency auditing and CodeQL security analysis.
-Runtime testing remains deferred. A failed security job requires review even
-when publication has already succeeded; it cannot undo a published version.
-If npm requires account 2FA for direct publication, run the workflow with mode
-`stage`, then approve the prepared version in npm's Staged Packages tab. Staging
-creates the GitHub prerelease with an explicit npm-pending note. After approval,
-the archive checksum can be compared with npm's `dist.integrity`; update the
-release note to reflect confirmed publication.
+Importing the package does not copy static assets into your application. If you
+use a bundler, configure asset copying explicitly. To use the current source
+version, follow [Local development](#local-development) and copy the built `dist/`.
 
-Publishing uses short-lived GitHub OIDC credentials; the workflow does not use
-a reusable `NPM_TOKEN` secret. An npm maintainer must configure trusted publishing
-once for owner `evan-hyer`, repository `privacy-mask-video`, workflow `release.yml`,
-with direct and staged publication allowed. From an authenticated npm CLI 12:
+## Quick start
 
-```powershell
-npm trust github privacy-mask-video --repo evan-hyer/privacy-mask-video --file release.yml --allow-publish --allow-stage-publish
+After copying the distribution, add the component to a page served over HTTPS
+or localhost:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mask faces in a video</title>
+    <script type="module" src="/components/privacy-mask-video/define.js"></script>
+  </head>
+  <body>
+    <privacy-mask-video emoji="😎" aria-label="Mask faces locally"></privacy-mask-video>
+  </body>
+</html>
 ```
 
-The npm account login and 2FA check establish that trust. Expired local login
-sessions do not affect subsequent CI releases. If publishing reports E401,
-verify the trusted publisher's owner, repository and workflow filename rather
-than copying a local session token into GitHub. See
-[npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+`define.js` registers the custom element automatically. Initialization begins
+when the element connects to the page. Import `index.js` instead to register it
+explicitly with `definePrivacyMaskVideo()`.
 
-## Run locally
+## Using the editor
 
-Use Node.js 24:
+1. Choose or drop a local MOV, MP4, or WebM video.
+2. Wait for the full-video scan to finish. Longer clips take more time.
+3. Select up to eight faces from the gallery. Tap a selected face again to remove it.
+4. Choose an emoji and select **Process video**.
+5. Review the entire result, including the marked tracking-loss intervals, then download.
 
-```powershell
+A face first detected later in the clip starts masking at its first detected
+appearance. The gallery can contain more than eight entries; eight is the
+selection limit.
+
+For a face missed in the opening frame, expand **Manual selection** and enable
+drawing or enter a rectangle in video pixels. Manual selection replaces the
+detected-face selection and applies only to the opening frame. Outside drawing
+mode, the preview permits normal touch scrolling and pinch zoom.
+
+## JavaScript API
+
+This example adds a file input and action buttons alongside the connected editor:
+
+```html
+<input id="video-file" type="file" accept=".mov,.mp4,.webm">
+<button id="process-video" type="button">Process</button>
+<button id="download-video" type="button">Download</button>
+<privacy-mask-video></privacy-mask-video>
+
+<script type="module">
+  import { definePrivacyMaskVideo } from '/components/privacy-mask-video/index.js';
+
+  definePrivacyMaskVideo();
+  const editor = document.querySelector('privacy-mask-video');
+
+  editor.addEventListener('pmv-error', ({ detail }) => {
+    console.info(detail.code, detail.message);
+  });
+
+  document.querySelector('#video-file').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      await editor.load(file);
+      if (editor.faces.length) editor.selectFace(editor.faces[0].id);
+    } catch (error) {
+      if (error.name !== 'AbortError') console.info(error.code, error.message);
+    }
+  });
+
+  document.querySelector('#process-video').addEventListener('click', async () => {
+    try {
+      const result = await editor.process();
+      // result.blob is the video; result.targetLosses reports each target.
+      console.info(result.filename, result.targetCount);
+    } catch (error) {
+      if (error.name !== 'AbortError') console.info(error.code, error.message);
+    }
+  });
+
+  document.querySelector('#download-video').addEventListener('click', () => editor.download());
+</script>
+```
+
+The first listed face is selected automatically only by the example above.
+The built-in UI requires explicit selection before processing.
+
+### Configuration
+
+| Attribute | Property | Behavior |
+| --- | --- | --- |
+| `emoji` | `emoji` | Defaults to 😎. Accepts one of the 22 bundled sequences. A valid change cancels active work and invalidates completed output. Invalid values throw `TypeError` and retain the previous value/result. |
+| `disabled` | `disabled` | Boolean attribute. Blocks new import, selection, and processing actions. Existing processing continues; cancel/reset remain available. `disabled="false"` still disables. |
+| `asset-base` | `assetBase` | Optional same-origin assets directory. Set before the element first connects. The worker still loads from the distribution's `workers/` directory. |
+
+Pre-upgrade property values take precedence over conflicting initial attributes.
+
+### Methods
+
+| Method | Behavior |
+| --- | --- |
+| `initialize()` | Initialize or retry resources while connected; returns a capability-report promise. `load()` also awaits initialization. |
+| `load(file)` | Load a nonempty local `File`, preflight export, and scan the entire video. An accepted replacement cancels previous work and clears old results. |
+| `selectFace(id)` | Select one current gallery face, replacing the selection. |
+| `selectFaces(ids)` | Select up to eight distinct current gallery IDs. An empty array clears selection. |
+| `selectRegion({ x, y, width, height })` | Select a positive rectangle fully inside the display-oriented opening frame. Replaces detected-face selections. |
+| `process()` | Process from the beginning with fresh tracking state; returns a promise of `ExportResult`. Concurrent processing calls reject. |
+| `cancel()` | Abort active work with `AbortError`. Processing cancellation retains the source and selection. |
+| `reset()` | Clear media and results while retaining configuration and reusable resident assets. |
+| `download()` | Download the current completed result. Call from a user gesture. |
+
+### Read-only properties
+
+| Property | Contents |
+| --- | --- |
+| `state` | Current lifecycle state, such as `loading`, `selected`, `processing`, `complete`, or `error`. |
+| `capabilities` | Capability-report snapshot, or `null` before initialization. |
+| `source` | Source dimensions, duration, container, and audio-track count; excludes the input `File`. |
+| `faces` | Gallery summaries with IDs, rectangles, landmarks, confidence, and `firstSeenUs`; excludes private appearance descriptors. |
+| `selectedFaceIds` | Selected detected-face IDs. |
+| `result` | Finalized `ExportResult`, or `null` before completion. Includes the `Blob`, filename, MIME type, dimensions, duration, frame/audio/target counts, aggregate `lostIntervals`, and per-target `targetLosses`. |
+
+Object and array snapshots are defensive and frozen. Timestamps and durations
+ending in `Us` are microseconds. Public types and typed errors are exported from
+`index.js`; declarations ship in `dist/`.
+
+Disconnecting terminates work and clears media and resident resources.
+Reconnecting starts an empty session. If your application retains a returned
+`Blob` or creates an object URL, it owns that reference and URL's lifetime.
+
+## Events
+
+Events bubble and cross Shadow DOM boundaries. Listen with `addEventListener`;
+payloads are available in `event.detail`.
+
+| Event | Detail |
+| --- | --- |
+| `pmv-ready` | `capabilities` |
+| `pmv-statechange` | `previous`, `state`, `jobId` |
+| `pmv-loaded` | `sourceId`, `width`, `height`, `durationUs`, `faceCount`, `audioTrackCount` |
+| `pmv-selectionchange` | `sourceId`, `selectionId`, `kind`, `candidateId`, `candidateIds`, `selectionCount` |
+| `pmv-progress` | `jobId`, `stage`, `processedFrames`, `timestampUs`, `durationUs`, `ratio` |
+| `pmv-trackingchange` | `jobId`, `status`, `reason`, `timestampUs` |
+| `pmv-complete` | `jobId` and result metadata, including tracking losses; retrieve the `Blob` through `result` or `process()`. |
+| `pmv-cancel` | `jobId`, `reason` |
+| `pmv-error` | `code`, `message`, `recoverable`, `jobId`, and an optional sanitized `diagnostic` |
+
+Progress stages are `scanning`, `processing`, and `finalizing`. State changes
+precede their associated events. `pmv-complete` fires after `result` becomes
+accessible and before `process()` resolves.
+
+Diagnostics use fixed stage/reason values and may include a known resource path
+and HTTP status. Event payloads exclude input files, image data, appearance
+descriptors, and private exception stacks.
+
+## Styling
+
+```css
+privacy-mask-video {
+  --pmv-accent: #74334f;
+  --pmv-background: #fffaf5;
+  --pmv-text: #34202b;
+  --pmv-border-radius: 16px;
+}
+
+privacy-mask-video::part(download-button) {
+  border-radius: 9999px;
+}
+```
+
+Available parts: `container`, `drop-zone`, `preview`, `face-list`, `controls`,
+`status`, `progress`, `review`, and `download-button`. Controls include keyboard
+face selection, numeric manual selection, and throttled status announcements.
+
+## How it works
+
+| Technology | Role |
+| --- | --- |
+| YuNet | Detect faces and five facial landmarks in each decoded frame. |
+| SFace | Generate appearance descriptors to match faces within the clip. |
+| ONNX Runtime Web | Run both models in a worker using single-thread CPU/WASM inference. |
+| Mediabunny and WebCodecs | Decode local media, preserve timing, and encode the masked result. |
+
+Discovery compares recent detections and a bounded set of remembered appearances
+with each identity. One-to-one assignments keep simultaneously visible people
+separate. Original thumbnails, references, and first-seen times stay stable.
+
+Export uses a fixed reference and independent tracker for each selected face.
+Uncertain matches or competing claims on one face become reported tracking
+losses, with masks held at their previous geometry. Manual targets start with a
+fixed grayscale correlation template and limited local recovery.
+
+An opaque circular backing encloses the estimated face rectangle. It does not
+prove coverage of the intended person when tracking is wrong or lost. Scanning
+and export each decode the video; preview throttling does not skip export frames.
+
+## Supported media and limits
+
+| Item | Support or limit |
+| --- | --- |
+| Input containers | MOV, MP4, WebM, recognized from contents rather than filename/MIME type alone. |
+| Input video | Exactly one video track with a browser-supported decoder. |
+| Export | MP4/AVC/AAC preferred, then WebM/VP9 or VP8/Opus, subject to runtime probes. |
+| Audio | Every track retained through compatible packet copy or local transcoding. Unsupported preservation routes fail. |
+| File size | 256 MiB each for input and encoded output. |
+| Duration | 10 minutes. |
+| Dimensions | At most 1920 pixels per side and 2,073,600 displayed pixels; portrait and landscape are subject to both limits. |
+| Selected targets | Up to eight detected faces, or one manual region. |
+
+Rotation and flip metadata are applied before selection and masking. Changing
+dimensions, unusable timing, extra video tracks, and unsupported codecs are rejected.
+Completed output is held in memory; speed and memory use depend on the device.
+
+### iPhone MOV files
+
+H.264 and HEVC/H.265 decoding depend on the browser's WebCodecs support. MOV
+support does not guarantee ProRes, HDR/Dolby Vision, cinematic auxiliary tracks,
+or every HEVC profile. Physical iPhone qualification remains outstanding.
+Recording H.264 at 1080p can improve compatibility; changing recording settings
+does not convert existing videos.
+
+## Browser and hosting requirements
+
+Serve the component and assets from the same origin over **HTTPS or localhost**.
+Opening a page through `file://` is unsupported. The browser needs custom elements,
+module workers, OffscreenCanvas 2D, WebCodecs, WebAssembly/SIMD, ImageBitmap support
+for PNGs, and Web Crypto. Capability probes determine available codec routes;
+there is no fully qualified browser/device matrix yet.
+
+Serve JavaScript modules, WASM, PNGs, JSON, and media with appropriate MIME types.
+Keep the distribution intact so relative module, worker, and asset URLs resolve.
+The build records a worker hash in `assets/manifest.json`; mixing assets from
+different builds can fail integrity checks.
+
+A restrictive Content Security Policy must permit same-origin assets, Blob
+workers and module imports, WASM compilation (`'wasm-unsafe-eval'` where
+applicable), inline component shadow styles, and Blob review media. Relevant
+directives include `script-src`, `worker-src`, `connect-src`, `style-src`, and
+`media-src`. The component does not modify your CSP. COOP/COEP headers are not
+required for the single-thread runtime.
+
+## Privacy
+
+Video, face processing, and export run locally. The component installs no upload
+API, analytics, service worker, or persistent media store. It performs no
+named-person lookup. Host applications can add their own functionality, so
+review the privacy policy of the page embedding it.
+
+Initialization fetches processing resources from the host origin and verifies
+their hashes. Resident resources support offline retries while the instance
+remains connected; offline page reload is outside scope. Reset/replacement
+clears media and face references; disconnect also releases resident assets.
+
+The embedding page can access local results. Shadow DOM provides style
+encapsulation, not a security boundary. Audio content remains identifiable
+unless you edit it separately.
+
+## Local development
+
+Use **Node.js 24** and npm:
+
+```sh
 git clone https://github.com/evan-hyer/privacy-mask-video.git
 cd privacy-mask-video
 npm ci
@@ -83,208 +338,71 @@ npm run assets:prepare
 npm run dev
 ```
 
-Open http://localhost:5173/demo/index.html. The dev command builds the distribution
-and serves it with Vite; restart it after source changes. It does not open an
-extra window. For a plain static host with no development WebSocket:
+Open [the local demo](http://localhost:5173/demo/index.html). The dev command
+builds the distribution before serving it; rebuild/restart after source changes.
 
-```powershell
+For a plain static server without the development WebSocket:
+
+```sh
 npm run build
 npm run serve:dist
 ```
 
-Open http://localhost:4173/demo/index.html. demo/embed.html contains two independent
-components and demonstrates pre-upgrade properties. The same distribution is
-available at /nested/components/privacy-mask-video/demo/index.html for nested
-hosting. npm publication distributes the component library; it does not deploy
-or host a website.
+Open [the built demo](http://localhost:4173/demo/index.html).
+`demo/embed.html` demonstrates two independent instances and pre-upgrade
+properties. The static server also exposes the distribution under
+`/nested/components/privacy-mask-video/` for nested-hosting checks.
 
-## Embed in an ordinary page
-
-Copy the **entire dist/** directory to a same-origin directory, preserving all
-modules, workers, assets and notices:
-
-```html
-<script type="module" src="/components/privacy-mask-video/define.js"></script>
-<privacy-mask-video emoji="😎" aria-label="Mask a face locally"></privacy-mask-video>
-```
-
-For explicit registration:
-
-```js
-import { definePrivacyMaskVideo } from '/components/privacy-mask-video/index.js';
-definePrivacyMaskVideo();
-const component = document.querySelector('privacy-mask-video');
-component.addEventListener('pmv-error', event => {
-  console.info(event.detail.code, event.detail.message);
-});
-await component.initialize();
-// Obtain a local File from a file input, then:
-await component.load(file);
-if (component.faces.length) component.selectFace(component.faces[0].id);
-// Alternatively: component.selectRegion({ x: 20, y: 30, width: 100, height: 120 });
-const result = await component.process();
-// Retrieve result.blob directly, or call download() from a user gesture.
-```
-
-index.js exports the element class, explicit registration, public types and typed
-errors. Its import does not register the tag. define.js auto-registers. Repeated
-registration using the same constructor is harmless; a conflicting constructor
-throws NotSupportedError. index.d.ts and supporting declarations ship in dist/.
-
-## Configuration and methods
-
-| Attribute | Property | Behavior |
-| --- | --- | --- |
-| emoji | emoji | Default 😎. One of the bundled 22 canonical sequences; valid changes cancel an active run and invalidate output. Invalid input throws TypeError, reports an error and retains the previous value/result. |
-| disabled | disabled | Boolean attribute; even disabled="false" disables. Blocks new import/selection/process actions; cancel/reset remain available and existing processing continues. |
-| asset-base | assetBase | Optional same-origin assets directory. Set before first connection; a later change throws TypeError. |
-
-Pre-upgrade property values win over conflicting initial attributes. No network
-or processing starts in the constructor. Read-only state, capabilities, source,
-faces and result properties return defensive frozen snapshots. source contains
-metadata, not the File; faces contains reference boundaries/landmarks and firstSeenUs
-from the full-video catalog, not appearance descriptors. result is null until finalization succeeds.
-
-| Method | Behavior |
+| Command | Purpose |
 | --- | --- |
-| initialize() | Initialize or retry local resources while connected; Promise of capability report. |
-| load(file) | Accept a positive-sized local File; await initialization, preflight export, scan every decoded frame and show the first frame plus a timestamped face gallery. Invalid arguments retain valid prior media; an accepted replacement cancels old work and clears old results. |
-| selectFace(id) | Select one current catalog candidate, replacing the selection. Processing never starts automatically. |
-| selectFaces(ids) | Replace the selection with up to eight distinct current candidate IDs; an empty array clears it. |
-| selectRegion(rect) | Select a finite, positive rectangle in the opening frame, entirely within the display-oriented source dimensions. |
-| process() | Process from the beginning with fresh identity state; Promise of a finalized ExportResult. Concurrent process calls reject. |
-| cancel() | Abort active work and reject its promise with AbortError; retain source/selection after processing cancellation. A worker that has not acknowledged within 250 ms is terminated. |
-| reset() | Clear media/results; retain configuration and reusable resident assets. |
-| download() | Initiate local browser download of a current completed result. Use a user gesture. |
+| `npm run assets:prepare` | Restore pinned binary assets from the manifest. |
+| `npm run assets:verify` | Verify resource hashes, model signatures, runtime files, and licenses. |
+| `npm run typecheck` | Check TypeScript without emitting files. |
+| `npm test` | Run unit and regression tests. |
+| `npm run build` | Verify assets and build modules, worker, declarations, and demos into `dist/`. |
+| `npm run fixtures:verify` | Check the real-video fixture corpus and annotations. |
+| `npm run test:browser` | Run the fixture-gated browser project. |
+| `npm run test:privacy` | Run the fixture-gated privacy project. |
+| `npm run test:performance` | Run the fixture-gated performance project. |
+| `npm run prepack` | Compile, build, and inspect the distribution for packaging. |
 
-Each instance owns its worker, identity state and media. Disconnect terminates
-work, rejects operations, closes bitmaps, revokes URLs and clears its media and
-assets. Reinsertion initializes an empty session. A host retaining a returned
-Blob owns that reference and any object URLs it creates.
+## Validation status
 
-## Events and styles
+On October 17, 2026, **all 22 unit tests, TypeScript checks, and the production
+build passed** for the discovery changes. Tests cover setup tooling, sanitized
+diagnostics, registry visibility, multi-target conflicts, and face-discovery
+regressions including changing appearances, reentry, and simultaneous lookalikes.
 
-Events bubble and cross Shadow DOM boundaries. Their detail objects are defensive
-snapshots, without input Files, image payloads, embeddings, or private stack data.
+These checks do not establish real-video accuracy or face coverage. Tracking
+thresholds remain provisional and uncalibrated. Real-face corpus acquisition,
+browser/privacy/performance qualification, codec and audio/timing validation,
+repeatability, and per-frame coverage checks remain outstanding. Browser scripts
+retain a fixture gate and fail when the required corpus is absent.
 
-| Event | Detail |
-| --- | --- |
-| pmv-ready | capabilities |
-| pmv-statechange | previous, state, jobId |
-| pmv-loaded | sourceId, width, height, durationUs, faceCount, audioTrackCount |
-| pmv-selectionchange | sourceId, selectionId, kind, candidateId |
-| pmv-progress | jobId, stage, processedFrames, timestampUs, durationUs, ratio |
-| pmv-trackingchange | jobId, status, reason, timestampUs |
-| pmv-complete | jobId, filename, MIME type, dimensions/timing/counts and lostIntervals; retrieve the Blob through result or process() |
-| pmv-cancel | jobId, reason |
-| pmv-error | code, message, recoverable, jobId |
+See the [implementation tasks](specs/001-local-video-privacy-mask/tasks.md) for
+outstanding qualification work. The [initial delivery report](specs/001-local-video-privacy-mask/validation/final.md)
+records the earlier baseline; its October 14 test counts are historical.
 
-The selectedFaceIds getter returns a defensive snapshot of selected detected-face IDs. Face buttons and preview taps toggle selection; selectFace(id) retains its exclusive-selection API behavior. Manual selection replaces detected-face selections. Export results include targetCount and per-target targetLosses alongside the aggregate lostIntervals.
+## Releases
 
-Error detail optionally includes a diagnostic with a fixed stage/reason, known public resource path and HTTP status. It never includes raw exceptions, file names, URLs, media or embeddings. The component itself sends no telemetry.
+Maintainers can run the GitHub Actions **Release** workflow or push a
+`v<package.json version>` tag. It restores pinned assets, runs unit tests, builds
+and inspects the package, publishes with npm provenance, verifies registry
+integrity, and creates an experimental GitHub release with the archive/checksum.
 
-State changes precede their associated events. Complete is emitted after the
-result becomes accessible and before process() resolves. Stale replies are
-discarded and transferred bitmaps closed. Status text distinguishes file
-completion from face coverage; review has seek buttons for lost intervals.
+Publishing uses GitHub OIDC trusted publishing, configured in npm for
+`evan-hyer/privacy-mask-video` and `release.yml`. No reusable `NPM_TOKEN` is used.
+If account policy requires staged publication, use workflow mode `stage` and
+approve the prepared version in npm. A staged version is not installable until
+approval; verify registry integrity and update the release note after publication.
 
-CSS properties: --pmv-accent, --pmv-background, --pmv-text,
---pmv-border-radius. Parts: container, drop-zone, preview, face-list, controls,
-status, progress, review, download-button. Host hidden behavior is respected.
-Controls have labels and type="button", keyboard face selection, numeric manual
-selection, and throttled status announcements.
+The final security job audits dependencies and runs CodeQL. Its failure requires
+review even if publication succeeded. Publishing the library does not deploy
+the demo website; that host must update its bundled package separately.
 
-## Processing and limitations
+## License
 
-The worker uses single-thread ONNX Runtime CPU/WASM, pinned YuNet/SFace models,
-fixed ordering/thresholds and a frozen within-clip appearance reference. YuNet
-detects every frame; ambiguous matching becomes loss with held geometry.
-Manual targets use a fixed grayscale correlation template. Brief local recovery
-is conservative; longer disappearance without an appearance anchor remains
-lost. Each selected face has its own frozen reference and tracker. Competing claims on one detected face are treated as ambiguous for both targets and retain their previous geometry. No named-person lookup or remote face processing is used.
-
-An opaque circular backing encloses the tracked rectangle, including when the
-emoji has transparent margins. This establishes coverage of the estimate; it
-does not prove coverage of the intended person during tracking errors or loss.
-The profile in src/vision/profile.ts is explicitly uncalibrated.
-
-Mediabunny/WebCodecs reads presentation-ordered samples. The adapter validates
-each decoded display size before drawing into a two-canvas pool, bakes orientation
-and flip into pixels, and retains timestamps/durations on a common audio/video
-timeline. Every successfully processed frame is masked and submitted to the
-encoder with backpressure. Preview throttling does not skip export frames.
-
-Export prefers MP4/AVC/AAC, then WebM/VP9 or VP8/Opus, with actual configuration
-probes. All audio tracks are retained using compatible packet copy or local
-transcoding. Unsupported preservation routes fail; no silent resize or audio
-removal. Audio content is not anonymized.
-
-Resource limits: 256 MiB input and output each, 10 minutes, 1920 pixels per side,
-and 2,073,600 displayed pixels. Encoded output is capped during writes before
-allocation. MP4 fast-start is disabled to limit buffering. The completed Blob is
-kept in memory; processing speed depends on hardware and codecs. Extra video
-tracks, unusable timing, changing dimensions and unsupported codecs are rejected.
-
-## Hosting and assets
-
-Serve over HTTPS or localhost with correct module, WASM, PNG and media MIME
-types. file:// hosting is unsupported. The host needs module workers,
-OffscreenCanvas 2D, WebCodecs, WebAssembly/SIMD and PNG ImageBitmap support. No browser
-has completed qualification yet; capability probes determine actual routes.
-
-All fixed processing resources load from the host origin before ready. Emoji images replace the CBDT/CBLC font that Apple renderers cannot load; no downloadable font is required. The
-component retains verified model data, emoji images, worker and runtime Blob URLs for
-offline retries while connected. Disconnect releases them. Offline page reload
-is outside scope. No service worker, upload API, analytics or persistent media
-store is installed. The trusted host page can access local results; Shadow DOM
-provides style encapsulation rather than a security boundary.
-
-A restrictive CSP must permit initial same-origin assets, Blob workers and Blob
-module imports, WASM compilation (wasm-unsafe-eval where applicable), component
-inline shadow styles and Blob review media. Appropriate
-directives include script-src, worker-src, connect-src, style-src and
-media-src. The component never changes CSP. COOP/COEP are not required for its
-single-thread runtime.
-
-Exact dependency versions are locked. assets/manifest.json records resource
-revisions, hashes, sizes, actual runtime tensor signatures and license texts.
-Large binary assets are ignored by Git; assets:prepare restores them and rejects
-mismatched resident files. The build adds the emitted worker hash to the
-distribution manifest. Full licenses ship in assets/licenses/ and are listed in
-THIRD_PARTY_NOTICES.txt.
-
-The project's original code currently has no open-source license grant
-(package metadata: UNLICENSED). Third-party resources retain their included
-upstream licenses.
-
-## Checks and deferred testing
-
-```powershell
-npm run assets:verify
-npm run typecheck
-npm run build
-```
-
-Testing was deferred on 2026-10-14. Existing npm test covers setup tooling, diagnostic sanitization and multi-target conflict resolution. It does not qualify tracking accuracy. Browser, privacy, performance, repeatability, codec,
-audio/timing, reference-alignment and per-frame face-coverage testing remain
-deferred, as do real fixture acquisition and profile calibration. These tasks
-are unchecked in specs/001-local-video-privacy-mask/tasks.md. Explicit browser
-scripts retain their fixture gate and fail on an absent corpus; they do not
-manufacture a passing result.
-
-See specs/001-local-video-privacy-mask/validation/final.md for the implementation
-mapping, actual compilation/build results and deferred qualification work.
-
-### iPhone MOV input
-
-QuickTime MOV, MP4 and WebM are recognized from their contents, including files
-with a missing or inaccurate MIME type. MOV uses the same local pipeline and
-outputs MP4 or WebM; input rotation is applied before face selection and masking.
-H.264 and HEVC/H.265 input require a decoder available through the browser
-WebCodecs API. MOV support does not guarantee ProRes, HDR/Dolby Vision, cinematic
-auxiliary tracks or every HEVC profile. One video track and the existing 1080p,
-256 MiB and 10 minute limits apply. For compatibility, record in H.264 at 1080p
-(Camera > Formats > Most Compatible and Camera > Record Video). Changing that
-setting affects new recordings, not existing files. Input failures include a
-fixed diagnostic reason for container, video tracks, video codec, audio codec
-or timing; no filename, codec description, metadata or raw exception is logged.
+The original project code is currently **UNLICENSED**, with no open-source
+license grant. Third-party models, runtime files, and emoji resources retain
+their included upstream licenses. See [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)
+and the packaged `assets/licenses/` directory.
