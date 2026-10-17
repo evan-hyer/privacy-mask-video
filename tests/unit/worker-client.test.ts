@@ -215,4 +215,3 @@ describe('cancellation', () => {
     expect(client.ready).toBe(true);
   });
 });
-
