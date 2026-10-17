@@ -366,12 +366,15 @@ properties. The static server also exposes the distribution under
 | `npm run test:performance` | Run the fixture-gated performance project. |
 | `npm run prepack` | Compile, build, and inspect the distribution for packaging. |
 
+Pull requests and pushes to `main` run TypeScript checks, unit tests, pinned
+asset preparation, and package build/inspection through the CI workflow.
+
 ## Validation status
 
-On October 17, 2026, **all 22 unit tests, TypeScript checks, and the production
-build passed** for the discovery changes. Tests cover setup tooling, sanitized
-diagnostics, registry visibility, multi-target conflicts, and face-discovery
-regressions including changing appearances, reentry, and simultaneous lookalikes.
+On October 17, 2026, **all 41 unit tests, TypeScript checks, and production
+packaging checks passed**. Tests cover setup tooling, sanitized diagnostics,
+registry visibility, multi-target conflicts, face-discovery ambiguity and reentry,
+and worker cancellation, failure recovery, stale messages, and disposal races.
 
 These checks do not establish real-video accuracy or face coverage. Tracking
 thresholds remain provisional and uncalibrated. Real-face corpus acquisition,
